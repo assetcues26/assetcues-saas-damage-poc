@@ -1,0 +1,296 @@
+{
+  "generated_on": "2026-06-07",
+  "valuation_date": "2026-06-07",
+  "notes": "Free-use stock images matched to catalog asset type and age (acquired 2021–2025). Mix of best/good/average/fair/damaged per asset for V6 demo uploads. Prefer direct download URLs; Wikimedia CC BY-SA may require attribution.",
+  "condition_scale": ["best", "good", "average", "fair", "damaged"],
+  "assets": [
+    {
+      "catalog_id": "ac-001",
+      "asset_name": "Micromax Split AC",
+      "acquisition_date": "2021-06-15",
+      "asset_age_years": 4.98,
+      "images": [
+        {
+          "condition": "best",
+          "angle_hint": "indoor_unit",
+          "description": "Clean modern split indoor wall unit (installed setting)",
+          "license": "CC BY-SA 4.0 (Wikimedia)",
+          "download_url": "https://upload.wikimedia.org/wikipedia/commons/1/12/Modern_split-type_air_conditioner_at_a_school.jpg",
+          "page_url": "https://commons.wikimedia.org/wiki/File:Modern_split-type_air_conditioner_at_a_school.jpg"
+        },
+        {
+          "condition": "good",
+          "angle_hint": "indoor_unit",
+          "description": "Split indoor evaporator unit, maintained",
+          "license": "CC BY-SA 4.0 (Wikimedia)",
+          "download_url": "https://upload.wikimedia.org/wikipedia/commons/e/e5/Daitsu_split-type_air_conditioner_indoor_unit.jpg",
+          "page_url": "https://commons.wikimedia.org/wiki/File:Daitsu_split-type_air_conditioner_indoor_unit.jpg"
+        },
+        {
+          "condition": "average",
+          "angle_hint": "outdoor_unit",
+          "description": "Outdoor condenser ~5yr typical plant install, light weathering",
+          "license": "CC BY-SA 4.0 (Wikimedia)",
+          "download_url": "https://upload.wikimedia.org/wikipedia/commons/9/94/YORK_(BRAND_FROM_JOHNSON_CONTROLS)_AIR_CONDITIONER_OUTDOOR_UNIT_(6).jpg",
+          "page_url": "https://commons.wikimedia.org/wiki/File:YORK_(BRAND_FROM_JOHNSON_CONTROLS)_AIR_CONDITIONER_OUTDOOR_UNIT_(6).jpg"
+        },
+        {
+          "condition": "fair",
+          "angle_hint": "outdoor_unit",
+          "description": "Aged outdoor unit on corroded exterior wall",
+          "license": "Pakutaso free (commercial OK, read terms)",
+          "download_url": "https://www.pakutaso.com/en/20240747211post-51852.html",
+          "page_url": "https://www.pakutaso.com/en/20240747211post-51852.html"
+        },
+        {
+          "condition": "damaged",
+          "angle_hint": "outdoor_unit",
+          "description": "Heavily rusted outdoor AC unit — poor/FAR write-down scenario",
+          "license": "Unsplash License",
+          "download_url": "https://unsplash.com/photos/Y4VXRTt9lAc/download?force=true",
+          "page_url": "https://unsplash.com/photos/a-rusty-air-conditioner-sitting-on-top-of-a-wall-Y4VXRTt9lAc"
+        }
+      ]
+    },
+    {
+      "catalog_id": "printer-003",
+      "asset_name": "HP LaserJet M208dw",
+      "acquisition_date": "2022-11-15",
+      "asset_age_years": 3.56,
+      "images": [
+        {
+          "condition": "best",
+          "angle_hint": "full_asset",
+          "description": "HP compact laser printer on desk — near-new condition",
+          "license": "Unsplash License",
+          "download_url": "https://unsplash.com/photos/CGnoRQZGWmw/download?force=true",
+          "page_url": "https://unsplash.com/photos/a-white-and-black-printer-sitting-on-top-of-a-counter-CGnoRQZGWmw"
+        },
+        {
+          "condition": "good",
+          "angle_hint": "full_asset",
+          "description": "White HP LaserJet on desk — good working order, light use marks",
+          "license": "Unsplash License",
+          "download_url": "https://unsplash.com/photos/G4FbQY2ZjZI/download?force=true",
+          "page_url": "https://unsplash.com/photos/a-white-printer-sitting-on-top-of-a-wooden-desk-G4FbQY2ZjZI"
+        },
+        {
+          "condition": "average",
+          "angle_hint": "tag_closeup",
+          "description": "Actual asset photo — AssetCues QR tag 10000078 on rear panel; HP LaserJet M208dw in routine office use",
+          "license": "Proprietary (internal inspection photo)",
+          "download_url": "local://printer-003-tag-10000078.jpg",
+          "page_url": "internal"
+        },
+        {
+          "condition": "fair",
+          "angle_hint": "model_label",
+          "description": "Actual asset photo — HP LaserJet M208dw model label closeup; paper loaded, surface dust visible",
+          "license": "Proprietary (internal inspection photo)",
+          "download_url": "local://printer-003-model-label.jpg",
+          "page_url": "internal"
+        },
+        {
+          "condition": "damaged",
+          "angle_hint": "full_asset",
+          "description": "Printer mechanical wear / paper jam scenario — damaged state reference",
+          "license": "Unsplash License",
+          "download_url": "https://unsplash.com/photos/Tzm3Oyu_6sk/download?force=true",
+          "page_url": "https://unsplash.com/photos/printing-machine-Tzm3Oyu_6sk"
+        }
+      ]
+    },
+    {
+      "catalog_id": "macbook-004",
+      "asset_name": "Apple MacBook Pro 16-inch Intel",
+      "acquisition_date": "2022-01-14",
+      "asset_age_years": 4.40,
+      "images": [
+        {
+          "condition": "best",
+          "angle_hint": "full_asset",
+          "description": "MacBook Pro 16-inch on desk — excellent cosmetic (CIPLA Goa class asset)",
+          "license": "Unsplash License",
+          "download_url": "https://unsplash.com/photos/5-KmbSe5ivg/download?force=true",
+          "page_url": "https://unsplash.com/photos/apple-macbook-pro-on-desk-5-KmbSe5ivg"
+        },
+        {
+          "condition": "good",
+          "angle_hint": "full_asset",
+          "description": "MacBook on wooden desk, normal ~4yr office use",
+          "license": "Unsplash License",
+          "download_url": "https://unsplash.com/photos/mlphGearJHw/download?force=true",
+          "page_url": "https://unsplash.com/photos/macbook-pro-on-brown-wooden-desk-mlphGearJHw"
+        },
+        {
+          "condition": "average",
+          "angle_hint": "full_asset",
+          "description": "MacBook workspace — average wear, daily carry",
+          "license": "Unsplash License",
+          "download_url": "https://unsplash.com/photos/ms-QnzmKGVM/download?force=true",
+          "page_url": "https://unsplash.com/photos/turned-on-macbook-pro-on-desk-ms-QnzmKGVM"
+        },
+        {
+          "condition": "fair",
+          "angle_hint": "screen_closeup",
+          "description": "Cracked laptop screen — fair/needs repair",
+          "license": "Unsplash License",
+          "download_url": "https://unsplash.com/photos/OIUpXdhfJ1w/download?force=true",
+          "page_url": "https://unsplash.com/photos/a-person-holding-a-pencil-and-a-broken-laptop-OIUpXdhfJ1w"
+        },
+        {
+          "condition": "damaged",
+          "angle_hint": "tag_closeup",
+          "description": "Use your real tagged MacBook photo (tag 10000052) for ERP tag-match demos; stock fallback below",
+          "license": "Unsplash License",
+          "download_url": "https://unsplash.com/photos/SMHx_spBYx0/download?force=true",
+          "page_url": "https://unsplash.com/photos/a-broken-laptop-computer-sitting-on-top-of-a-table-SMHx_spBYx0"
+        }
+      ]
+    },
+    {
+      "catalog_id": "laptop-015",
+      "asset_name": "HP 15 Laptop",
+      "acquisition_date": "2022-05-10",
+      "asset_age_years": 4.08,
+      "images": [
+        {
+          "condition": "best",
+          "angle_hint": "full_asset",
+          "description": "HP 15 laptop open on desk — clean/near-new state reference",
+          "license": "Pexels License",
+          "download_url": "https://www.pexels.com/photo/8284722/download/",
+          "page_url": "https://www.pexels.com/photo/black-and-silver-laptop-computer-8284722/"
+        },
+        {
+          "condition": "good",
+          "angle_hint": "full_asset",
+          "description": "HP laptop in office use — light surface marks, good working order",
+          "license": "Pexels License",
+          "download_url": "https://www.pexels.com/photo/3197390/download/",
+          "page_url": "https://www.pexels.com/photo/man-using-dell-laptop-3197390/"
+        },
+        {
+          "condition": "average",
+          "angle_hint": "full_asset",
+          "description": "Laptop workspace — average daily carry wear after ~3 years",
+          "license": "Unsplash License",
+          "download_url": "https://unsplash.com/photos/ms-QnzmKGVM/download?force=true",
+          "page_url": "https://unsplash.com/photos/turned-on-macbook-pro-on-desk-ms-QnzmKGVM"
+        },
+        {
+          "condition": "fair",
+          "angle_hint": "full_asset",
+          "description": "Actual asset photo (open view) — HP 15 laptop with heavy keyboard/lid wear, screen functional, significant cosmetic deterioration",
+          "license": "Proprietary (internal inspection photo)",
+          "download_url": "local://laptop-015-fair-open.jpg",
+          "page_url": "internal"
+        },
+        {
+          "condition": "damaged",
+          "angle_hint": "lid_and_base",
+          "description": "Actual asset photos (lid + base views) — heavily scratched/dirty lid, worn chassis underside with service tag visible; approaching end of useful life",
+          "license": "Proprietary (internal inspection photo)",
+          "download_url": "local://laptop-015-damaged-lid-base.jpg",
+          "page_url": "internal"
+        }
+      ]
+    },
+    {
+      "catalog_id": "rack-012",
+      "asset_name": "Material Storage A-Frame Rack",
+      "acquisition_date": "2021-04-15",
+      "asset_age_years": 5.14,
+      "images": [
+        {
+          "condition": "best",
+          "angle_hint": "full_asset",
+          "description": "New A-frame long-material storage rack — factory finish",
+          "license": "CC BY-SA 4.0 (Wikimedia)",
+          "download_url": "https://upload.wikimedia.org/wikipedia/commons/a/ac/Selective_pallet_rack.jpg",
+          "page_url": "https://commons.wikimedia.org/wiki/File:Selective_pallet_rack.jpg"
+        },
+        {
+          "condition": "good",
+          "angle_hint": "full_asset",
+          "description": "A-frame rack frame in warehouse aisle — light use",
+          "license": "Unsplash License",
+          "download_url": "https://unsplash.com/photos/oMpAz-DN-9I/download?force=true",
+          "page_url": "https://unsplash.com/photos/warehouse-shelving-oMpAz-DN-9I"
+        },
+        {
+          "condition": "average",
+          "angle_hint": "full_asset",
+          "description": "Industrial storage frame — average 5-year warehouse use",
+          "license": "Unsplash License",
+          "download_url": "https://unsplash.com/photos/TNlHf4m4gpI/download?force=true",
+          "page_url": "https://unsplash.com/photos/a-large-warehouse-with-lots-of-shelving-TNlHf4m4gpI"
+        },
+        {
+          "condition": "fair",
+          "angle_hint": "base_closeup",
+          "description": "Frame base with paint flaking and surface rust — fair condition",
+          "license": "Unsplash License",
+          "download_url": "https://unsplash.com/photos/UBhpOIHnazM/download?force=true",
+          "page_url": "https://unsplash.com/photos/brown-wooden-shelves-in-a-room-UBhpOIHnazM"
+        },
+        {
+          "condition": "damaged",
+          "angle_hint": "full_asset",
+          "description": "Actual asset photo — green A-frame rack with extensive paint peeling; floor anchor plates visible; frame distorted under load",
+          "license": "Proprietary (internal inspection photo)",
+          "download_url": "local://rack-012-damaged-frame.jpg",
+          "page_url": "internal"
+        }
+      ]
+    },
+    {
+      "catalog_id": "vehicle-010",
+      "asset_name": "Tata Nexon XZ+ Petrol",
+      "acquisition_date": "2025-03-01",
+      "asset_age_years": 1.27,
+      "images": [
+        {
+          "condition": "best",
+          "angle_hint": "front_view",
+          "description": "Tata Nexon XZA+ front — excellent cosmetic (same model family)",
+          "license": "CC BY-SA 4.0 (Wikimedia)",
+          "download_url": "https://upload.wikimedia.org/wikipedia/commons/e/e5/2023_Tata_Nexon_XZA+_front_view.jpg",
+          "page_url": "https://commons.wikimedia.org/wiki/File:2023_Tata_Nexon_XZA+_front_view.jpg"
+        },
+        {
+          "condition": "good",
+          "angle_hint": "three_quarter",
+          "description": "Tata Nexon dual-tone — good fleet condition",
+          "license": "CC BY-SA 4.0 (Wikimedia)",
+          "download_url": "https://upload.wikimedia.org/wikipedia/commons/2/25/Tata_Nexon_Blue_Dual_Tone.jpg",
+          "page_url": "https://commons.wikimedia.org/wiki/File:Tata_Nexon_Blue_Dual_Tone.jpg"
+        },
+        {
+          "condition": "average",
+          "angle_hint": "front_view",
+          "description": "Tata Nexon XM — reference stock for condition comparison",
+          "license": "CC BY-SA 4.0 (Wikimedia)",
+          "download_url": "https://upload.wikimedia.org/wikipedia/commons/8/88/2018_Tata_Nexon_XM.jpg",
+          "page_url": "https://commons.wikimedia.org/wiki/File:2018_Tata_Nexon_XM.jpg"
+        },
+        {
+          "condition": "fair",
+          "angle_hint": "body_panel",
+          "description": "Scratched/dented grey car fender — fair body damage",
+          "license": "Unsplash License",
+          "download_url": "https://unsplash.com/photos/F_EZo6Rr_bE/download?force=true",
+          "page_url": "https://unsplash.com/photos/damaged-grey-car-fender-with-cracked-paint-F_EZo6Rr_bE"
+        },
+        {
+          "condition": "damaged",
+          "angle_hint": "rear_view",
+          "description": "Heavy scratch damage on SUV rear panel",
+          "license": "Unsplash License",
+          "download_url": "https://unsplash.com/photos/3wylDrjxH-E/download?force=true",
+          "page_url": "https://unsplash.com/photos/white-car-with-rear-collision-damage-3wylDrjxH-E"
+        }
+      ]
+    }
+  ]
+}

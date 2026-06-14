@@ -1,0 +1,28 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# IDE / local
+.cursor/
+*.log
+.DS_Store
+Thumbs.db
+
+# Test / coverage
+htmlcov/
+.coverage
+coverage/

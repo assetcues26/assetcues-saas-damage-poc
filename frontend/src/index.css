@@ -1,0 +1,205 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Aurora gradient tokens (must be on :root for var() in hero backdrop). */
+    --white: #ffffff;
+    --black: #000000;
+    --transparent: transparent;
+    --blue-500: #3b82f6;
+    --blue-400: #60a5fa;
+    --blue-300: #93c5fd;
+    --indigo-300: #a5b4fc;
+    --violet-200: #ddd6fe;
+
+    /* shadcn / Origin UI button tokens */
+    --background: 0 0% 98%;
+    --foreground: 240 10% 4%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 10%;
+    --input: 240 6% 90%;
+    --ring: 221 83% 53%;
+    --border: 240 6% 90%;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    color-scheme: light;
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+    max-width: 100%;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  html::-webkit-scrollbar {
+    display: none;
+  }
+
+  body {
+    overflow-x: hidden;
+    max-width: 100%;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  body::-webkit-scrollbar {
+    display: none;
+  }
+
+  #root {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+}
+
+@layer utilities {
+  .pt-safe {
+    padding-top: max(0px, env(safe-area-inset-top));
+  }
+
+  .pb-safe {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  .px-safe {
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+    padding-right: max(0.75rem, env(safe-area-inset-right));
+  }
+
+  .touch-target {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  .capture-flash-overlay {
+    animation: capture-flash 180ms ease-out forwards;
+  }
+
+  .capture-pill-bump {
+    animation: capture-pill-bump 320ms ease-out;
+  }
+
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+}
+
+@layer components {
+  .aurora-backdrop-layer {
+    --white-gradient: repeating-linear-gradient(
+      100deg,
+      var(--white) 0%,
+      var(--white) 7%,
+      var(--transparent) 10%,
+      var(--transparent) 12%,
+      var(--white) 16%
+    );
+    --aurora: repeating-linear-gradient(
+      100deg,
+      var(--blue-500) 10%,
+      var(--indigo-300) 15%,
+      var(--blue-300) 20%,
+      var(--violet-200) 25%,
+      var(--blue-400) 30%
+    );
+    position: absolute;
+    inset: -10px;
+    opacity: 0.5;
+    background-image: var(--white-gradient), var(--aurora);
+    background-size: 300% 200%;
+    background-position: 50% 50%, 50% 50%;
+    filter: blur(10px) invert(1);
+    will-change: transform;
+    pointer-events: none;
+  }
+
+  .aurora-backdrop-layer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: var(--white-gradient), var(--aurora);
+    background-size: 200% 100%;
+    background-position: 50% 50%, 50% 50%;
+    mix-blend-mode: difference;
+    animation: aurora 60s linear infinite;
+  }
+
+  .aurora-backdrop-layer--contained::after {
+    background-attachment: scroll;
+  }
+
+  .aurora-backdrop-layer--viewport::after {
+    background-attachment: fixed;
+  }
+
+  .aurora-backdrop-layer--masked {
+    mask-image: radial-gradient(ellipse at 100% 0%, black 10%, var(--transparent) 70%);
+  }
+
+  .logo-element-video-wrap {
+    position: relative;
+    flex-shrink: 0;
+    background: transparent;
+  }
+
+  .logo-element-video-source {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .logo-element-video-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+  }
+
+}
+
+@keyframes capture-flash {
+  0% {
+    opacity: 0.9;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes capture-pill-bump {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.18);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}

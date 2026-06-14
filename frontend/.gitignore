@@ -1,0 +1,16 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+
+# Environment & local tooling
+.env
+.env.*
+!.env.example
+
+# Test / IDE / Vercel
+coverage
+.vite
+.vercel
+*.log

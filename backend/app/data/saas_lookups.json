@@ -1,0 +1,29 @@
+{
+  "assetclass": [
+    { "id": "IT", "name": "IT Equipment" },
+    { "id": "HVAC", "name": "HVAC" },
+    { "id": "OFF", "name": "Office Equipment" },
+    { "id": "VEH", "name": "Vehicles" }
+  ],
+  "category": [
+    { "id": "cat-laptop", "name": "Laptops", "assetclassid": "IT" },
+    { "id": "cat-hvac", "name": "HVAC", "assetclassid": "HVAC" },
+    { "id": "cat-printer", "name": "Printers", "assetclassid": "OFF" },
+    { "id": "cat-ac", "name": "Air Conditioning", "assetclassid": "HVAC" }
+  ],
+  "subcategory": [
+    { "id": "sub-laptop", "name": "Business Laptop", "categoryid": "cat-laptop" },
+    { "id": "sub-split-ac", "name": "Split AC", "categoryid": "cat-ac" },
+    { "id": "sub-laser", "name": "Laser Printer", "categoryid": "cat-printer" }
+  ],
+  "makemodel": [
+    { "id": "mm-dell-lat", "name": "Dell Latitude", "subcategoryid": "sub-laptop" },
+    { "id": "mm-hp-lj", "name": "HP LaserJet M208dw", "subcategoryid": "sub-laser" },
+    { "id": "mm-mmx-ac", "name": "Micromax Split AC", "subcategoryid": "sub-split-ac" }
+  ],
+  "company": [
+    { "id": "1000", "name": "Tech Co India Pvt Ltd" },
+    { "id": "2000", "name": "Global Manufacturing Ltd" },
+    { "id": "3000", "name": "AssetCues Demo Corp" }
+  ]
+}

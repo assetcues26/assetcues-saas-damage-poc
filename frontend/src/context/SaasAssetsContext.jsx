@@ -1,0 +1,285 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  bulkAnalyzeSaasAssets,
+  bulkDeleteSaasAssets,
+  exportAssetsCsv,
+  fetchActivity,
+  fetchDashboardStats,
+  fetchSaasAssetsList,
+  runSaasAssetAnalysis,
+} from '../services/saasAssetsApi';
+import { isAssetAnalyzing, withAnalyzingState } from '../utils/saasAssetState';
+
+const SaasAssetsContext = createContext(null);
+
+const POLL_MS = 5000;
+const POLL_MS_ANALYZING = 2000;
+const ACTIVITY_POLL_MS = 10000;
+const PAGE_SIZE = 25;
+
+function computeStatsFromAssets(items, total) {
+  const stats = {
+    total: total ?? items.length,
+    pass_count: 0,
+    fail_count: 0,
+    pending: 0,
+    error: 0,
+    analyzing: 0,
+  };
+  for (const asset of items) {
+    const status = asset.ai_status || 'pending';
+    if (status === 'pass') stats.pass_count += 1;
+    else if (status === 'fail') stats.fail_count += 1;
+    else if (status === 'error') stats.error += 1;
+    else if (status === 'analyzing') stats.analyzing += 1;
+    else stats.pending += 1;
+  }
+  return stats;
+}
+
+function isNetworkError(err) {
+  return err instanceof TypeError && /failed to fetch/i.test(err.message);
+}
+
+export function SaasAssetsProvider({ children }) {
+  const [assets, setAssets] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
+  const [aiStatusFilter, setAiStatusFilter] = useState(null);
+  const [sort, setSort] = useState('created_at');
+  const [order, setOrder] = useState('desc');
+  const [page, setPage] = useState(0);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [activity, setActivity] = useState([]);
+  const pollRef = useRef(null);
+  const activityRef = useRef(null);
+
+  const markAssetAnalyzing = useCallback((assetId) => {
+    setAssets((prev) =>
+      prev.map((asset) => (asset.id === assetId ? withAnalyzingState(asset) : asset)),
+    );
+  }, []);
+
+  const markAssetsAnalyzing = useCallback((assetIds) => {
+    const idSet = new Set(assetIds);
+    setAssets((prev) =>
+      prev.map((asset) => (idSet.has(asset.id) ? withAnalyzingState(asset) : asset)),
+    );
+  }, []);
+
+  const load = useCallback(async (opts = {}) => {
+    const silent = opts.silent === true;
+    if (!silent) setLoading(true);
+    try {
+      const body = await fetchSaasAssetsList({
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
+        q: search || undefined,
+        ai_status: aiStatusFilter || undefined,
+        sort,
+        order,
+      });
+      setAssets(body.items || []);
+      setTotal(body.total ?? 0);
+      setError(null);
+      setStats((prev) => {
+        if (prev != null) return prev;
+        return computeStatsFromAssets(body.items || [], body.total);
+      });
+    } catch (err) {
+      if (!silent || assets.length === 0) {
+        const message =
+          isNetworkError(err) && assets.length > 0
+            ? 'Connection lost — showing last loaded data'
+            : err instanceof Error
+              ? err.message
+              : 'Failed to load assets';
+        setError(message);
+      }
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [search, aiStatusFilter, sort, order, page, assets.length]);
+
+  const loadStats = useCallback(async () => {
+    try {
+      const s = await fetchDashboardStats();
+      setStats(s);
+    } catch {
+      try {
+        const body = await fetchSaasAssetsList({ limit: 200 });
+        setStats(computeStatsFromAssets(body.items || [], body.total));
+      } catch {
+        /* keep previous stats */
+      }
+    }
+  }, []);
+
+  const loadActivity = useCallback(async () => {
+    try {
+      const body = await fetchActivity(20);
+      setActivity(body.items || []);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    loadStats();
+    loadActivity();
+  }, [load, loadStats, loadActivity]);
+
+  useEffect(() => {
+    if (stats == null && !loading && total > 0) {
+      setStats(computeStatsFromAssets(assets, total));
+    }
+  }, [stats, loading, total, assets]);
+
+  const hasAnalyzing = assets.some(isAssetAnalyzing);
+
+  useEffect(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(() => {
+      load({ silent: true });
+      loadStats();
+    }, hasAnalyzing ? POLL_MS_ANALYZING : POLL_MS);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [load, loadStats, hasAnalyzing]);
+
+  useEffect(() => {
+    activityRef.current = setInterval(loadActivity, ACTIVITY_POLL_MS);
+    return () => {
+      if (activityRef.current) clearInterval(activityRef.current);
+    };
+  }, [loadActivity]);
+
+  const runAnalysis = useCallback(
+    async (assetId) => {
+      markAssetAnalyzing(assetId);
+      try {
+        await runSaasAssetAnalysis(assetId);
+        await load({ silent: true });
+        await loadStats();
+      } catch (err) {
+        await load({ silent: true });
+        throw err;
+      }
+    },
+    [load, loadStats, markAssetAnalyzing],
+  );
+
+  const toggleSelected = useCallback((id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }, []);
+
+  const toggleSelectAll = useCallback((ids) => {
+    setSelectedIds((prev) => (prev.length === ids.length ? [] : ids));
+  }, []);
+
+  const bulkAnalyze = useCallback(async () => {
+    if (!selectedIds.length) return;
+    markAssetsAnalyzing(selectedIds);
+    try {
+      await bulkAnalyzeSaasAssets(selectedIds);
+      setSelectedIds([]);
+      await load({ silent: true });
+      await loadStats();
+    } catch (err) {
+      await load({ silent: true });
+      throw err;
+    }
+  }, [selectedIds, load, loadStats, markAssetsAnalyzing]);
+
+  const bulkDelete = useCallback(async () => {
+    if (!selectedIds.length) return;
+    await bulkDeleteSaasAssets(selectedIds);
+    setSelectedIds([]);
+    await load({ silent: true });
+    await loadStats();
+  }, [selectedIds, load, loadStats]);
+
+  const exportCsv = useCallback(async () => {
+    const blob = await exportAssetsCsv({
+      q: search || undefined,
+      ai_status: aiStatusFilter || undefined,
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'saas-assets.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [search, aiStatusFilter]);
+
+  const value = useMemo(
+    () => ({
+      assets,
+      total,
+      loading,
+      error,
+      search,
+      setSearch,
+      aiStatusFilter,
+      setAiStatusFilter,
+      sort,
+      setSort,
+      order,
+      setOrder,
+      page,
+      setPage,
+      pageSize: PAGE_SIZE,
+      selectedIds,
+      setSelectedIds,
+      toggleSelected,
+      toggleSelectAll,
+      stats,
+      activity,
+      refresh: load,
+      runAnalysis,
+      markAssetAnalyzing,
+      bulkAnalyze,
+      bulkDelete,
+      exportCsv,
+    }),
+    [
+      assets,
+      total,
+      loading,
+      error,
+      search,
+      aiStatusFilter,
+      sort,
+      order,
+      page,
+      selectedIds,
+      stats,
+      activity,
+      load,
+      runAnalysis,
+      markAssetAnalyzing,
+      bulkAnalyze,
+      bulkDelete,
+      exportCsv,
+      toggleSelected,
+      toggleSelectAll,
+    ],
+  );
+
+  return <SaasAssetsContext.Provider value={value}>{children}</SaasAssetsContext.Provider>;
+}
+
+export function useSaasAssets() {
+  const ctx = useContext(SaasAssetsContext);
+  if (!ctx) {
+    throw new Error('useSaasAssets must be used within SaasAssetsProvider');
+  }
+  return ctx;
+}
