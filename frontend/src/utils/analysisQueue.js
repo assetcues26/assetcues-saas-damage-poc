@@ -4,7 +4,7 @@ const queue = [];
 let draining = false;
 let currentAssetId = null;
 
-async function waitForAnalysisComplete(assetId, maxMs = 180000) {
+async function waitForAnalysisComplete(assetId, maxMs = 60000) {
   const start = Date.now();
   while (Date.now() - start < maxMs) {
     const detail = await fetchSaasAsset(assetId);
@@ -23,8 +23,21 @@ async function runOneAnalysis(assetId, hooks = {}) {
   hooks.onStart?.(assetId);
   currentAssetId = assetId;
   try {
-    await runSaasAssetAnalysis(assetId);
-    const { status, asset } = await waitForAnalysisComplete(assetId);
+    const body = await runSaasAssetAnalysis(assetId);
+    let status = body?.ai_status || 'error';
+    let asset = null;
+    if (status === 'analyzing') {
+      const polled = await waitForAnalysisComplete(assetId);
+      status = polled.status;
+      asset = polled.asset;
+    } else {
+      try {
+        const detail = await fetchSaasAsset(assetId);
+        asset = detail?.asset || null;
+      } catch {
+        /* use status only */
+      }
+    }
     hooks.onDone?.(assetId, status, asset);
     return status;
   } catch (err) {
@@ -64,11 +77,7 @@ async function drainQueue() {
         job.resolve(status);
       }
     } catch (err) {
-      if (job.type === 'batch') {
-        job.reject(err);
-      } else {
-        job.reject(err);
-      }
+      job.reject(err);
     }
   }
   draining = false;

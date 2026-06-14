@@ -234,7 +234,16 @@ class SaasAssetsRepository:
                 latest_by_asset[aid] = row
         return latest_by_asset
 
-    STALE_ANALYZING_SECONDS = 60
+    STALE_ANALYZING_SECONDS = 30
+
+    def _reset_stuck_analyzing_sync(self, asset_id: str) -> str:
+        latest = self._latest_analysis_for_asset(asset_id)
+        restored = self._restore_ai_status_from_latest_sync(asset_id) if latest else None
+        if restored:
+            return restored
+        status = "pending" if not latest else "error"
+        self._table("registered_assets").update({"ai_status": status}).eq("id", asset_id).execute()
+        return status
 
     def _restore_ai_status_from_latest_sync(self, asset_id: str) -> str | None:
         latest = self._latest_analysis_for_asset(asset_id)
@@ -256,20 +265,14 @@ class SaasAssetsRepository:
         status = row.get("ai_status") or "pending"
         if status != "analyzing":
             return row
-        latest = self._latest_analysis_for_asset(row["id"])
-        if not latest:
-            return row
-        prev = latest.get("ai_status")
-        if prev not in ("pass", "fail"):
-            return row
         updated = self._parse_ts(row.get("updated_at"))
         if not updated:
             return row
         age = (datetime.now(timezone.utc) - updated).total_seconds()
         if age < self.STALE_ANALYZING_SECONDS:
             return row
-        restored = self._restore_ai_status_from_latest_sync(row["id"])
-        return {**row, "ai_status": restored} if restored else row
+        new_status = self._reset_stuck_analyzing_sync(row["id"])
+        return {**row, "ai_status": new_status}
 
     def _ensure_analysis_not_stuck_sync(self, asset_id: str) -> None:
         result = (
@@ -282,9 +285,7 @@ class SaasAssetsRepository:
         rows = result.data or []
         if not rows or rows[0].get("ai_status") != "analyzing":
             return
-        restored = self._restore_ai_status_from_latest_sync(asset_id)
-        if not restored:
-            self._table("registered_assets").update({"ai_status": "error"}).eq("id", asset_id).execute()
+        self._reset_stuck_analyzing_sync(asset_id)
 
     def _record_analysis_error_sync(self, asset_id: str, user_id: int, message: str) -> None:
         self._table("registered_assets").update({"ai_status": "error"}).eq("id", asset_id).execute()

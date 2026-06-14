@@ -185,7 +185,7 @@ def test_get_session_completed_returns_410(saas_settings):
     assert response.status_code == 410
 
 
-def test_analyze_asset_triggers_background(saas_settings):
+def test_analyze_asset_runs_inline(saas_settings):
     mock_repo = MagicMock()
     mock_repo.enabled = True
     mock_repo.get_asset = AsyncMock(
@@ -194,18 +194,17 @@ def test_analyze_asset_triggers_background(saas_settings):
             latest_analysis=None,
         )
     )
-    mock_repo.set_ai_status = AsyncMock()
+    mock_repo.run_analysis = AsyncMock(return_value="pass")
 
     app = create_app()
     app.dependency_overrides[get_settings] = lambda: saas_settings
     app.dependency_overrides[get_repo] = lambda: mock_repo
     client = TestClient(app)
 
-    with patch("app.api.v1.saas_assets._background_analyze", new_callable=AsyncMock):
-        response = client.post(f"/v1/saas/assets/{TEST_ASSET_ID}/analyze")
+    response = client.post(f"/v1/saas/assets/{TEST_ASSET_ID}/analyze")
     assert response.status_code == 200
-    assert response.json()["ai_status"] == "analyzing"
-    mock_repo.set_ai_status.assert_awaited_once()
+    assert response.json()["ai_status"] == "pass"
+    mock_repo.run_analysis.assert_awaited_once()
 
 
 def test_validate_create_metadata_required_fields():
@@ -428,21 +427,24 @@ def test_analyze_with_metadata_patch(saas_settings):
             latest_analysis=None,
         )
     )
-    mock_repo.set_ai_status = AsyncMock()
+    mock_repo.run_analysis = AsyncMock(return_value="pass")
 
     app = create_app()
     app.dependency_overrides[get_settings] = lambda: saas_settings
     app.dependency_overrides[get_repo] = lambda: mock_repo
     client = TestClient(app)
 
-    with patch("app.api.v1.saas_assets._background_analyze", new_callable=AsyncMock) as bg:
-        response = client.post(
-            f"/v1/saas/assets/{TEST_ASSET_ID}/analyze",
-            json={"metadata_patch": {"cost": "130000"}},
-        )
+    response = client.post(
+        f"/v1/saas/assets/{TEST_ASSET_ID}/analyze",
+        json={"metadata_patch": {"cost": "130000"}},
+    )
     assert response.status_code == 200
-    assert response.json()["ai_status"] == "analyzing"
-    bg.assert_awaited_once()
+    assert response.json()["ai_status"] == "pass"
+    mock_repo.run_analysis.assert_awaited_once_with(
+        saas_settings.demo_user_id,
+        TEST_ASSET_ID,
+        {"cost": "130000"},
+    )
 
 
 def test_upload_asset_images_success(saas_settings):

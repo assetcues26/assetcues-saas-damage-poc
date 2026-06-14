@@ -851,7 +851,6 @@ async def bulk_analyze_assets(
 )
 async def analyze_asset(
     asset_id: UUID,
-    background_tasks: BackgroundTasks,
     body: AnalyzeAssetRequest | None = Body(default=None),
     repo: SaasAssetsRepository = Depends(get_repo),
     settings: Settings = Depends(get_settings),
@@ -868,11 +867,19 @@ async def analyze_asset(
             detail="Upload asset photos before running AI analysis",
         )
     patch = body.metadata_patch if body else None
-    await repo.set_ai_status(str(asset_id), "analyzing")
-    background_tasks.add_task(
-        _background_analyze, settings, str(asset_id), settings.demo_user_id, patch
-    )
-    return AnalyzeAssetResponse(asset_id=str(asset_id), ai_status="analyzing")
+    try:
+        final_status = await repo.run_analysis(
+            settings.demo_user_id,
+            str(asset_id),
+            patch,
+        )
+        return AnalyzeAssetResponse(asset_id=str(asset_id), ai_status=final_status)
+    except Exception as exc:
+        logger.exception("saas_analyze_failed", asset_id=str(asset_id), error=str(exc))
+        await repo.ensure_analysis_not_stuck(str(asset_id))
+        detail_after = await repo.get_asset(settings.demo_user_id, str(asset_id))
+        status = detail_after.asset.ai_status if detail_after else "error"
+        return AnalyzeAssetResponse(asset_id=str(asset_id), ai_status=status)
 
 
 @router.get(

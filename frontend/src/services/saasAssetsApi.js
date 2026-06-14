@@ -5,7 +5,7 @@ import { withUploadRetries } from '../utils/uploadRetry';
 
 const SAAS_BASE = `${ASSET_ANALYSIS_API_BASE}/v1/saas`;
 const UPLOAD_TIMEOUT_MS = 120_000;
-const ANALYZE_TIMEOUT_MS = 30_000;
+const ANALYZE_TIMEOUT_MS = 300_000;
 
 function saasHeaders() {
   const headers = { Accept: 'application/json' };
