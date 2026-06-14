@@ -1,8 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { AssetPhotoUploadPanel } from './AssetPhotoUploadPanel';
+import { AssetCreateQrPanel } from './AssetCreateQrPanel';
 import { uploadSaasAssetImages } from '../../services/saasAssetsApi';
 import { useApp } from '../../context/AppContext';
+import { SESSION_MODE_IMAGES_ONLY } from './assetFormConfig';
+
+async function fileFromUrl(url, filename) {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  return new File([blob], filename, { type: blob.type || 'image/jpeg' });
+}
 
 /**
  * Upload photos to an existing asset (e.g. metadata-only / pending registration).
@@ -20,8 +28,18 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
   const [barcodeFile, setBarcodeFile] = useState(null);
   const [assetPreview, setAssetPreview] = useState(null);
   const [barcodePreview, setBarcodePreview] = useState(null);
+  const [sessionAssetUrl, setSessionAssetUrl] = useState(null);
+  const [sessionBarcodeUrl, setSessionBarcodeUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
+
+  const sessionDraft = useMemo(
+    () => ({
+      _session_mode: SESSION_MODE_IMAGES_ONLY,
+      _existing_asset_id: assetId,
+    }),
+    [assetId],
+  );
 
   useEffect(() => {
     if (!assetFile) {
@@ -43,18 +61,59 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
     return () => URL.revokeObjectURL(url);
   }, [barcodeFile]);
 
+  const handleAssetFile = (file) => {
+    setAssetFile(file);
+    setSessionAssetUrl(null);
+  };
+
+  const handleBarcodeFile = (file) => {
+    setBarcodeFile(file);
+    setSessionBarcodeUrl(null);
+  };
+
+  const onSessionImages = useCallback(
+    (session) => {
+      if (session.asset_image_url) {
+        setSessionAssetUrl(session.asset_image_url);
+        setAssetFile(null);
+        setAssetPreview(null);
+        showToast('Asset photo synced from phone', 'success');
+      }
+      if (session.barcode_image_url) {
+        setSessionBarcodeUrl(session.barcode_image_url);
+        setBarcodeFile(null);
+        setBarcodePreview(null);
+        showToast('Barcode photo synced from phone', 'success');
+      }
+    },
+    [showToast],
+  );
+
+  const hasAssetImage = Boolean(assetFile || sessionAssetUrl);
+  const displayAssetPreview = assetPreview || sessionAssetUrl;
+  const displayBarcodePreview = barcodePreview || sessionBarcodeUrl;
+
   const handleUpload = async () => {
-    if (!assetFile) {
-      setError('Asset photo is required');
+    if (!hasAssetImage) {
+      setError('Asset photo is required — upload from computer or scan the QR code on your phone');
       return;
     }
     setUploading(true);
     setError(null);
     onAnalyzing?.();
     try {
+      let imageFile = assetFile;
+      if (!imageFile && sessionAssetUrl) {
+        imageFile = await fileFromUrl(sessionAssetUrl, 'asset.jpg');
+      }
+      let barcode = barcodeFile;
+      if (!barcode && sessionBarcodeUrl) {
+        barcode = await fileFromUrl(sessionBarcodeUrl, 'barcode.jpg');
+      }
+
       await uploadSaasAssetImages(assetId, {
-        assetImage: assetFile,
-        barcodeImage: barcodeFile || undefined,
+        assetImage: imageFile,
+        barcodeImage: barcode || undefined,
       });
       showToast(
         `Photos saved for ${assetName || 'asset'} — AI analysis started`,
@@ -62,6 +121,8 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
       );
       setAssetFile(null);
       setBarcodeFile(null);
+      setSessionAssetUrl(null);
+      setSessionBarcodeUrl(null);
       await onComplete?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed');
@@ -75,15 +136,23 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
     <section className="rounded-xl border border-amber-200 bg-amber-50/50 p-5 shadow-sm">
       <h2 className="text-sm font-semibold uppercase text-amber-800">Add photos</h2>
       <p className="mt-1 text-sm text-amber-900/80">
-        This asset was registered without images. Upload a main asset photo to run AI validation.
+        This asset was registered without images. Upload from your computer or scan the QR code
+        with your phone, then run AI validation.
       </p>
 
-      <div className="mt-4">
+      <div className="mt-4 grid gap-6 lg:grid-cols-2">
         <AssetPhotoUploadPanel
-          assetPreview={assetPreview}
-          barcodePreview={barcodePreview}
-          onAssetFile={setAssetFile}
-          onBarcodeFile={setBarcodeFile}
+          assetPreview={displayAssetPreview}
+          barcodePreview={displayBarcodePreview}
+          onAssetFile={handleAssetFile}
+          onBarcodeFile={handleBarcodeFile}
+        />
+        <AssetCreateQrPanel
+          mode="images_only"
+          draftJson={sessionDraft}
+          onSessionImages={onSessionImages}
+          title="Upload from mobile"
+          description="Scan the QR code to capture or upload asset and barcode photos from your phone. Images sync here automatically."
         />
       </div>
 
@@ -94,10 +163,12 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <Button variant="primary" disabled={uploading || !assetFile} onClick={handleUpload}>
+        <Button variant="primary" disabled={uploading || !hasAssetImage} onClick={handleUpload}>
           {uploading ? 'Uploading…' : 'Upload & run AI'}
         </Button>
-        <p className="text-xs text-amber-800/70">Barcode photo is optional.</p>
+        <p className="text-xs text-amber-800/70">
+          Asset photo required · barcode optional · computer or mobile
+        </p>
       </div>
     </section>
   );
