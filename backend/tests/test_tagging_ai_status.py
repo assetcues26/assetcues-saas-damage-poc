@@ -1,6 +1,6 @@
 """Tests for Tagging AI pass/fail computation."""
 
-from app.services.tagging_ai_client import compute_ai_status
+from app.services.tagging_ai_client import compute_ai_status, resolve_image_readability
 
 
 def _full_pass_response():
@@ -40,6 +40,30 @@ def test_compute_ai_status_fail_on_cost():
     data["costvalidation"] = {"costmatch": "N"}
     status, _ = compute_ai_status(data)
     assert status == "fail"
+
+
+def test_resolve_image_readability_two_images():
+    assert resolve_image_readability(has_asset_image=True, has_barcode_image=True) == "Y"
+    assert (
+        resolve_image_readability(
+            has_asset_image=True, has_barcode_image=True, ai_value="E"
+        )
+        == "Y"
+    )
+
+
+def test_resolve_image_readability_no_images():
+    assert resolve_image_readability(has_asset_image=False, has_barcode_image=False) == "N"
+
+
+def test_resolve_image_readability_single_image():
+    assert resolve_image_readability(has_asset_image=True, has_barcode_image=False) == "Y"
+    assert (
+        resolve_image_readability(
+            has_asset_image=True, has_barcode_image=False, ai_value="N"
+        )
+        == "N"
+    )
 
 
 def test_compute_ai_status_field_comparison():

@@ -960,3 +960,20 @@ export async function exportAssetReportPdf(entry) {
   const filename = `AssetCues-Report-${sanitizeFilename(entry.asset_name)}-${new Date().toISOString().slice(0, 10)}.pdf`;
   doc.save(filename);
 }
+
+export {
+  THEMES,
+  MARGIN,
+  PAGE_WIDTH,
+  CONTENT_WIDTH,
+  FOOTER_Y,
+  sanitizeFilename,
+  truncateText,
+  wrapText,
+  createPageState,
+  drawPageFooter,
+  prepareLogoForPdf,
+  prepareImageForPdf,
+  drawSection,
+  drawImagesGrid,
+};

@@ -46,6 +46,43 @@ TEXT_FIELDS = (
 )
 
 
+def resolve_image_readability(
+    *,
+    has_asset_image: bool,
+    has_barcode_image: bool,
+    ai_value: str | None = None,
+) -> str:
+    """
+    Normalize imageReadability to Y or N from uploads (and AI when one image).
+
+    - Both asset + barcode images → Y
+    - No images → N
+    - One image → Y unless Tagging AI explicitly returned N
+    """
+    if has_asset_image and has_barcode_image:
+        return "Y"
+    if not has_asset_image and not has_barcode_image:
+        return "N"
+    raw = str(ai_value or "").strip().upper()
+    return "N" if raw == "N" else "Y"
+
+
+def apply_image_readability(
+    response: dict[str, Any],
+    *,
+    has_asset_image: bool,
+    has_barcode_image: bool,
+) -> str:
+    """Write normalized Y/N into response before pass/fail computation."""
+    value = resolve_image_readability(
+        has_asset_image=has_asset_image,
+        has_barcode_image=has_barcode_image,
+        ai_value=response.get("imageReadability"),
+    )
+    response["imageReadability"] = value
+    return value
+
+
 def build_field_comparison(
     metadata: dict[str, Any], response: dict[str, Any]
 ) -> dict[str, dict[str, Any]]:

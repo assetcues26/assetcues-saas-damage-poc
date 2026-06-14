@@ -31,11 +31,13 @@ from app.models.saas_assets import (
     BulkActionResponse,
     BulkAssetIdsRequest,
     CompleteAssetSessionResponse,
+    ClearAnalysesResponse,
     CreateAssetResponse,
     CreateAssetSessionRequest,
     CreateAssetSessionResponse,
     LookupItem,
     LookupListResponse,
+    NextAssetIdentifiersResponse,
     SaasActivityEvent,
     SaasActivityListResponse,
     SaasAnalysisItem,
@@ -198,7 +200,9 @@ async def _background_analyze(
         )
     except Exception as exc:
         logger.exception("saas_background_analyze_failed", asset_id=asset_id, error=str(exc))
-        await repo.set_ai_status(asset_id, "error")
+        restored = await repo.restore_ai_status_from_latest_analysis(asset_id)
+        if not restored:
+            await repo.set_ai_status(asset_id, "error")
 
 
 @router.get(
@@ -287,7 +291,7 @@ async def export_assets_csv(
     return PlainTextResponse(
         content=csv_text,
         media_type="text/csv",
-        headers={"Content-Disposition": 'attachment; filename="saas-assets.csv"'},
+        headers={"Content-Disposition": 'attachment; filename="assetcues-assets.csv"'},
     )
 
 
@@ -376,6 +380,22 @@ async def delete_web_draft(
 
 
 @router.get(
+    "/assets/next-identifiers",
+    response_model=NextAssetIdentifiersResponse,
+    dependencies=[Depends(verify_demo_api_key)],
+)
+async def get_next_asset_identifiers(
+    repo: SaasAssetsRepository = Depends(get_repo),
+    settings: Settings = Depends(get_settings),
+    rate_limiter: RateLimiter = Depends(get_saas_rate_limiter),
+) -> NextAssetIdentifiersResponse:
+    rate_limiter.check("saas_assets")
+    _require_saas(repo)
+    ids = await repo.get_next_asset_identifiers(settings.demo_user_id)
+    return NextAssetIdentifiersResponse(**ids)
+
+
+@router.get(
     "/assets",
     response_model=SaasAssetListResponse,
     dependencies=[Depends(verify_demo_api_key)],
@@ -435,6 +455,8 @@ async def create_asset(
     background_tasks: BackgroundTasks,
     assetimage: Annotated[UploadFile, File()],
     barcodeimage: Annotated[UploadFile | None, File()] = None,
+    auto_analyze: Annotated[bool, Query()] = True,
+    skip_ai: Annotated[bool, Query()] = False,
     assetid: Annotated[str | None, Form()] = None,
     assetname: Annotated[str | None, Form()] = None,
     description: Annotated[str | None, Form()] = None,
@@ -521,19 +543,25 @@ async def create_asset(
         logger.exception("saas_create_asset_failed", error=str(exc))
         raise HTTPException(status_code=503, detail="Failed to create asset") from exc
 
-    await repo.set_ai_status(result.id, "analyzing")
-    background_tasks.add_task(
-        _background_analyze,
-        settings,
-        result.id,
-        settings.demo_user_id,
-        None,
-        asset_image=asset_bytes,
-        barcode_image=barcode_bytes,
-        asset_mime=asset_mime,
-        barcode_mime=barcode_mime,
+    final_status = "analyzing" if auto_analyze else ("ai_disabled" if skip_ai else "pending")
+    await repo.set_ai_status(result.id, final_status)
+    if auto_analyze:
+        background_tasks.add_task(
+            _background_analyze,
+            settings,
+            result.id,
+            settings.demo_user_id,
+            None,
+            asset_image=asset_bytes,
+            barcode_image=barcode_bytes,
+            asset_mime=asset_mime,
+            barcode_mime=barcode_mime,
+        )
+    return CreateAssetResponse(
+        id=result.id,
+        assetid=result.assetid,
+        ai_status=final_status,
     )
-    return CreateAssetResponse(id=result.id, assetid=result.assetid, ai_status="analyzing")
 
 
 @router.post(
@@ -608,6 +636,7 @@ async def upload_asset_images(
     barcodeimage: Annotated[UploadFile | None, File()] = None,
     session_token: Annotated[str | None, Query()] = None,
     reanalyze: Annotated[bool, Query()] = True,
+    auto_analyze: Annotated[bool, Query()] = True,
     repo: SaasAssetsRepository = Depends(get_repo),
     settings: Settings = Depends(get_settings),
     rate_limiter: RateLimiter = Depends(get_saas_rate_limiter),
@@ -633,7 +662,6 @@ async def upload_asset_images(
     asset_mime = "image/jpeg"
     barcode_bytes = None
     barcode_mime = "image/jpeg"
-    used_session = False
 
     try:
         asset_bytes, asset_mime = await _read_optional_upload(assetimage, "asset.jpg", settings)
@@ -643,36 +671,47 @@ async def upload_asset_images(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    if token and not asset_bytes and not barcode_bytes:
+    if token:
         if not is_valid_asset_session_token(token):
             raise HTTPException(status_code=400, detail="Invalid session token")
         try:
-            updated = await repo.apply_session_images_to_asset(
+            session_asset, session_barcode = await repo.load_session_images_for_asset(
                 settings.demo_user_id,
                 str(asset_id),
                 token,
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if not updated:
-            raise HTTPException(status_code=404, detail="Asset not found")
-        used_session = True
-    elif not asset_bytes and not barcode_bytes:
-        raise HTTPException(status_code=400, detail="Empty file upload")
-    elif not asset_bytes and not has_existing_asset_image:
-        raise HTTPException(status_code=400, detail="Asset image is required")
-    else:
-        updated = await repo.update_asset(
-            settings.demo_user_id,
-            str(asset_id),
-            {},
-            asset_image=asset_bytes,
-            barcode_image=barcode_bytes,
-            asset_mime=asset_mime,
-            barcode_mime=barcode_mime,
+        except SessionCompletedError as exc:
+            raise HTTPException(status_code=410, detail=str(exc)) from exc
+        except SessionExpiredError as exc:
+            raise HTTPException(status_code=410, detail=str(exc)) from exc
+        if not asset_bytes:
+            asset_bytes = session_asset
+            asset_mime = "image/jpeg"
+        if not barcode_bytes and session_barcode:
+            barcode_bytes = session_barcode
+            barcode_mime = "image/jpeg"
+
+    if not asset_bytes and not barcode_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide assetimage, barcodeimage, or session_token with synced photos",
         )
-        if not updated:
-            raise HTTPException(status_code=404, detail="Asset not found")
+    if not asset_bytes and not has_existing_asset_image:
+        raise HTTPException(status_code=400, detail="Asset image is required")
+
+    updated = await repo.update_asset(
+        settings.demo_user_id,
+        str(asset_id),
+        {},
+        asset_image=asset_bytes,
+        barcode_image=barcode_bytes,
+        asset_mime=asset_mime,
+        barcode_mime=barcode_mime,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Asset not found")
 
     await repo.log_activity(
         settings.demo_user_id,
@@ -683,8 +722,8 @@ async def upload_asset_images(
         assetid=updated.assetid,
     )
 
-    got_asset_image = asset_bytes is not None or used_session or has_existing_asset_image
-    should_analyze = reanalyze and got_asset_image
+    got_asset_image = asset_bytes is not None or has_existing_asset_image
+    should_analyze = reanalyze and got_asset_image and auto_analyze
     if should_analyze:
         await repo.set_ai_status(str(asset_id), "analyzing")
         background_tasks.add_task(
@@ -764,6 +803,22 @@ async def bulk_delete_assets(
     return BulkActionResponse(processed=count, asset_ids=body.asset_ids)
 
 
+@router.delete(
+    "/analyses",
+    response_model=ClearAnalysesResponse,
+    dependencies=[Depends(verify_demo_api_key)],
+)
+async def clear_all_analyses(
+    repo: SaasAssetsRepository = Depends(get_repo),
+    settings: Settings = Depends(get_settings),
+    rate_limiter: RateLimiter = Depends(get_saas_rate_limiter),
+) -> ClearAnalysesResponse:
+    rate_limiter.check("saas_assets")
+    _require_saas(repo)
+    result = await repo.clear_all_analyses(settings.demo_user_id)
+    return ClearAnalysesResponse(**result)
+
+
 @router.post(
     "/assets/bulk-analyze",
     response_model=BulkActionResponse,
@@ -793,7 +848,6 @@ async def bulk_analyze_assets(
 )
 async def analyze_asset(
     asset_id: UUID,
-    background_tasks: BackgroundTasks,
     body: AnalyzeAssetRequest | None = Body(default=None),
     repo: SaasAssetsRepository = Depends(get_repo),
     settings: Settings = Depends(get_settings),
@@ -810,11 +864,17 @@ async def analyze_asset(
             detail="Upload asset photos before running AI analysis",
         )
     patch = body.metadata_patch if body else None
-    await repo.set_ai_status(str(asset_id), "analyzing")
-    background_tasks.add_task(
-        _background_analyze, settings, str(asset_id), settings.demo_user_id, patch
-    )
-    return AnalyzeAssetResponse(asset_id=str(asset_id), ai_status="analyzing")
+    try:
+        final_status = await repo.run_analysis(
+            settings.demo_user_id,
+            str(asset_id),
+            patch,
+        )
+        return AnalyzeAssetResponse(asset_id=str(asset_id), ai_status=final_status)
+    except Exception as exc:
+        logger.exception("saas_analyze_failed", asset_id=str(asset_id), error=str(exc))
+        restored = await repo.restore_ai_status_from_latest_analysis(str(asset_id))
+        return AnalyzeAssetResponse(asset_id=str(asset_id), ai_status=restored or "error")
 
 
 @router.get(
@@ -905,6 +965,34 @@ async def get_asset_session(
     return detail
 
 
+@router.patch(
+    "/asset-sessions/{token}/draft",
+    response_model=AssetCreateSessionDetail,
+    dependencies=[Depends(verify_demo_api_key)],
+)
+async def save_asset_session_draft(
+    token: str,
+    body: CreateAssetSessionRequest,
+    repo: SaasAssetsRepository = Depends(get_repo),
+    settings: Settings = Depends(get_settings),
+    rate_limiter: RateLimiter = Depends(get_saas_rate_limiter),
+) -> AssetCreateSessionDetail:
+    """Persist mobile/web form progress on an asset-create session."""
+    rate_limiter.check("saas_asset_sessions")
+    _require_saas(repo)
+    if not is_valid_asset_session_token(token):
+        raise HTTPException(status_code=400, detail="Invalid session token")
+    try:
+        detail = await repo.update_asset_session_draft(token, body.draft_json)
+    except SessionCompletedError as exc:
+        raise HTTPException(status_code=410, detail=str(exc)) from exc
+    except SessionExpiredError as exc:
+        raise HTTPException(status_code=410, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return detail
+
+
 @router.post(
     "/asset-sessions/{token}/images",
     response_model=AssetCreateSessionDetail,
@@ -957,6 +1045,8 @@ async def upload_asset_session_image(
 async def complete_asset_session(
     token: str,
     background_tasks: BackgroundTasks,
+    auto_analyze: Annotated[bool, Query()] = True,
+    skip_ai: Annotated[bool, Query()] = False,
     assetid: Annotated[str | None, Form()] = None,
     assetname: Annotated[str | None, Form()] = None,
     description: Annotated[str | None, Form()] = None,
@@ -1010,7 +1100,9 @@ async def complete_asset_session(
     )
 
     try:
-        result = await repo.complete_asset_session(token, meta)
+        result = await repo.complete_asset_session(
+            token, meta, auto_analyze=auto_analyze, skip_ai=skip_ai
+        )
     except SessionCompletedError as exc:
         raise HTTPException(status_code=410, detail=str(exc)) from exc
     except SessionExpiredError as exc:
@@ -1021,7 +1113,8 @@ async def complete_asset_session(
         logger.exception("saas_complete_session_failed", error=str(exc))
         raise HTTPException(status_code=503, detail="Failed to create asset") from exc
 
-    background_tasks.add_task(
-        _background_analyze, settings, result.asset_id, settings.demo_user_id
-    )
+    if result.ai_status == "analyzing":
+        background_tasks.add_task(
+            _background_analyze, settings, result.asset_id, settings.demo_user_id
+        )
     return result

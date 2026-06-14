@@ -9,6 +9,7 @@ import { SaasFlowPageLayout } from '../../components/saas/SaasFlowPageLayout';
 import { useApp } from '../../context/AppContext';
 import { useSaasAssets } from '../../context/SaasAssetsContext';
 import { createSaasAsset, saveWebDraft } from '../../services/saasAssetsApi';
+import { useSaasSettings } from '../../context/SaasSettingsContext';
 import { AssetCreateQrPanel } from '../../components/saas/AssetCreateQrPanel';
 import { AssetPhotoUploadPanel } from '../../components/saas/AssetPhotoUploadPanel';
 import { CreateAssetModeCards } from '../../components/saas/CreateAssetModeCards';
@@ -25,13 +26,15 @@ import {
 } from '../../components/saas/assetFormConfig';
 import { applyAssetFormPrefs, saveAssetFormPrefs } from '../../utils/assetFormPrefs';
 import { clearWizardDraft, loadWizardDraft, saveWizardDraft } from '../../utils/assetFormDraft';
+import { useAutoAssetIdentifiers } from '../../hooks/useAutoAssetIdentifiers';
 
 const DRAFT_DEBOUNCE_MS = 3000;
 
 export function CreateAssetPage() {
   const navigate = useNavigate();
   const { showToast } = useApp();
-  const { refreshAll } = useSaasAssets();
+  const { refreshAll, queueNewAssetAnalysis } = useSaasAssets();
+  const { aiAnalysisEnabled } = useSaasSettings();
   const [createMode, setCreateMode] = useState(null);
   const [values, setValues] = useState(() => applyAssetFormPrefs({ ...EMPTY_ASSET_FORM }));
   const [wizardStep, setWizardStep] = useState(0);
@@ -47,6 +50,8 @@ export function CreateAssetPage() {
   const [draftDrawerOpen, setDraftDrawerOpen] = useState(false);
   const mobileSectionRef = useRef(null);
   const draftTimerRef = useRef(null);
+
+  useAutoAssetIdentifiers(setValues, { enabled: createMode === 'web' });
 
   const scrollToMobileSection = useCallback(() => {
     mobileSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -196,9 +201,20 @@ export function CreateAssetPage() {
       }
 
       saveAssetFormPrefs(values);
-      await createSaasAsset(assetFormToPayload(values), imageFile, barcode || undefined);
+      const result = await createSaasAsset(
+        assetFormToPayload(values),
+        imageFile,
+        barcode || undefined,
+        { autoAnalyze: false, skipAi: !aiAnalysisEnabled },
+      );
       clearWizardDraft();
-      showToast('Asset created — AI analysis started', 'success');
+      if (aiAnalysisEnabled) {
+        queueNewAssetAnalysis(result.id);
+        showToast('Asset created — AI analysis queued', 'success');
+      } else {
+        showToast('Asset created — AI analysis is disabled in settings', 'success');
+      }
+      await refreshAll({ silent: true });
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create asset');
@@ -304,6 +320,7 @@ export function CreateAssetPage() {
             <CreateAssetWizard
               values={values}
               onChange={handleChange}
+              onPatch={(patch) => setValues((prev) => ({ ...prev, ...patch }))}
               step={wizardStep}
               onStepChange={(n) => {
                 if (n > wizardStep) {

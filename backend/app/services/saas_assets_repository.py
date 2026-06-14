@@ -234,6 +234,43 @@ class SaasAssetsRepository:
                 latest_by_asset[aid] = row
         return latest_by_asset
 
+    STALE_ANALYZING_SECONDS = 120
+
+    def _restore_ai_status_from_latest_sync(self, asset_id: str) -> str | None:
+        latest = self._latest_analysis_for_asset(asset_id)
+        if not latest:
+            return None
+        prev = latest.get("ai_status")
+        if prev not in ("pass", "fail"):
+            return None
+        self._table("registered_assets").update({"ai_status": prev}).eq("id", asset_id).execute()
+        return prev
+
+    async def restore_ai_status_from_latest_analysis(self, asset_id: str) -> str | None:
+        return await asyncio.to_thread(self._restore_ai_status_from_latest_sync, asset_id)
+
+    def _recover_stale_asset_row_sync(self, row: dict) -> dict:
+        status = row.get("ai_status") or "pending"
+        if status not in ("analyzing", "error"):
+            return row
+        latest = self._latest_analysis_for_asset(row["id"])
+        if not latest:
+            return row
+        prev = latest.get("ai_status")
+        if prev not in ("pass", "fail"):
+            return row
+        if status == "error":
+            restored = self._restore_ai_status_from_latest_sync(row["id"])
+            return {**row, "ai_status": restored} if restored else row
+        updated = self._parse_ts(row.get("updated_at"))
+        if not updated:
+            return row
+        age = (datetime.now(timezone.utc) - updated).total_seconds()
+        if age < self.STALE_ANALYZING_SECONDS:
+            return row
+        restored = self._restore_ai_status_from_latest_sync(row["id"])
+        return {**row, "ai_status": restored} if restored else row
+
     def _summary_from_row(self, row: dict, *, latest: dict | None = None) -> SaasAssetSummary:
         if latest is None:
             latest = self._latest_analysis_for_asset(row["id"])
@@ -241,11 +278,7 @@ class SaasAssetsRepository:
         latest_id = None
         failure_summary = None
         ai_status = row.get("ai_status") or "pending"
-        if ai_status == "analyzing":
-            summary_fields = {}
-            failure_summary = None
-            latest_id = None
-        elif latest:
+        if latest:
             latest_id = latest.get("id")
             failure_summary = latest.get("failure_summary")
             resp = latest.get("response_json") or {}
@@ -275,6 +308,8 @@ class SaasAssetsRepository:
             cost=float(cost) if cost is not None else None,
             acquisitiondate=row.get("acquisitiondate"),
             ai_status=ai_status,
+            asset_image_path=row.get("asset_image_path"),
+            barcode_image_path=row.get("barcode_image_path"),
             asset_image_url=self._signed_url(row.get("asset_image_path")),
             barcode_image_url=self._signed_url(row.get("barcode_image_path")),
             created_at=self._iso(row.get("created_at")),
@@ -300,6 +335,33 @@ class SaasAssetsRepository:
             if m:
                 max_num = max(max_num, int(m.group(1)))
         return f"AST-{max_num + 1}"
+
+    def _max_numeric_suffix(self, values: list[str], pattern: re.Pattern[str], default: int) -> int:
+        max_num = default
+        for raw in values:
+            m = pattern.match(str(raw or "").strip())
+            if m:
+                max_num = max(max_num, int(m.group(1)))
+        return max_num
+
+    def _generate_assetnumber_sync(self, user_id: int) -> str:
+        result = (
+            self._table("registered_assets")
+            .select("assetnumber")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .limit(200)
+            .execute()
+        )
+        nums = [str(row.get("assetnumber") or "") for row in result.data or []]
+        max_num = self._max_numeric_suffix(nums, re.compile(r"^FAR-?(\d+)$", re.I), 1000)
+        return f"FAR{max_num + 1}"
+
+    def _get_next_identifiers_sync(self, user_id: int) -> dict[str, str]:
+        return {
+            "assetid": self._generate_assetid_sync(user_id),
+            "assetnumber": self._generate_assetnumber_sync(user_id),
+        }
 
     def _expire_session_if_needed(self, row: dict) -> dict:
         expires = self._parse_ts(row.get("expires_at"))
@@ -355,6 +417,10 @@ class SaasAssetsRepository:
         data = {k: metadata.get(k) for k in ASSET_METADATA_KEYS}
         if not str(data.get("assetid") or "").strip():
             data["assetid"] = self._generate_assetid_sync(user_id)
+        if not str(data.get("assetnumber") or "").strip():
+            data["assetnumber"] = self._generate_assetnumber_sync(user_id)
+        if not str(data.get("customerid") or "").strip() and str(data.get("companyid") or "").strip():
+            data["customerid"] = str(data["companyid"]).strip()
         data["cost"] = self._normalize_cost(data.get("cost"))
         data["user_id"] = user_id
         data["ai_status"] = "pending"
@@ -481,6 +547,7 @@ class SaasAssetsRepository:
         )
         rows = result.data or []
         total = result.count if result.count is not None else len(rows)
+        rows = [self._recover_stale_asset_row_sync(r) for r in rows]
         latest_map = self._latest_analyses_map_for_assets([r["id"] for r in rows])
         return [
             self._summary_from_row(r, latest=latest_map.get(r["id"])) for r in rows
@@ -501,7 +568,8 @@ class SaasAssetsRepository:
         rows = result.data or []
         if not rows:
             return None
-        summary = self._summary_from_row(rows[0])
+        row = self._recover_stale_asset_row_sync(rows[0])
+        summary = self._summary_from_row(row)
         latest_row = self._latest_analysis_for_asset(asset_id)
         latest = None
         if latest_row:
@@ -518,6 +586,9 @@ class SaasAssetsRepository:
                 response_json=latest_row.get("response_json"),
             )
         return SaasAssetDetailResponse(asset=summary, latest_analysis=latest)
+
+    async def get_next_asset_identifiers(self, user_id: int) -> dict[str, str]:
+        return await asyncio.to_thread(self._get_next_identifiers_sync, user_id)
 
     async def create_asset(
         self,
@@ -725,6 +796,11 @@ class SaasAssetsRepository:
             ).execute()
             return "error"
 
+        apply_image_readability(
+            response,
+            has_asset_image=bool(asset_bytes),
+            has_barcode_image=bool(barcode_bytes),
+        )
         ai_status, failure_summary = compute_ai_status(response, metadata)
         self._table("asset_analyses").insert(
             {
@@ -838,6 +914,35 @@ class SaasAssetsRepository:
             raise RuntimeError("Failed to create asset session")
         return self._session_to_detail(created)
 
+    async def update_asset_session_draft(
+        self, token: str, draft_patch: dict[str, Any]
+    ) -> AssetCreateSessionDetail:
+        return await asyncio.to_thread(
+            self._update_asset_session_draft_sync, token, draft_patch
+        )
+
+    def _update_asset_session_draft_sync(
+        self, token: str, draft_patch: dict[str, Any]
+    ) -> AssetCreateSessionDetail:
+        row = self._fetch_session_by_token_sync(token)
+        if not row:
+            raise ValueError("Session not found")
+        if row.get("status") == "completed":
+            raise SessionCompletedError("Session already used")
+        if row.get("status") == "expired":
+            raise SessionExpiredError("Session expired")
+
+        existing = dict(row.get("draft_json") or {})
+        existing.update(draft_patch)
+        result = (
+            self._table("asset_create_sessions")
+            .update({"draft_json": existing})
+            .eq("id", row["id"])
+            .execute()
+        )
+        updated = (result.data or [row])[0]
+        return self._session_to_detail(updated)
+
     async def get_asset_session(self, token: str) -> AssetCreateSessionDetail | None:
         return await asyncio.to_thread(self._get_asset_session_sync, token)
 
@@ -897,12 +1002,14 @@ class SaasAssetsRepository:
         return self._session_to_detail(updated)
 
     async def complete_asset_session(
-        self, token: str, metadata: dict[str, Any]
+        self, token: str, metadata: dict[str, Any], *, auto_analyze: bool = True, skip_ai: bool = False
     ) -> CompleteAssetSessionResponse:
-        return await asyncio.to_thread(self._complete_asset_session_sync, token, metadata)
+        return await asyncio.to_thread(
+            self._complete_asset_session_sync, token, metadata, auto_analyze, skip_ai
+        )
 
     def _complete_asset_session_sync(
-        self, token: str, metadata: dict[str, Any]
+        self, token: str, metadata: dict[str, Any], auto_analyze: bool = True, skip_ai: bool = False
     ) -> CompleteAssetSessionResponse:
         row = self._fetch_session_by_token_sync(token)
         if not row:
@@ -919,8 +1026,9 @@ class SaasAssetsRepository:
             )
 
         merged = {**draft, **metadata}
-        merged["_has_asset_image"] = bool(row.get("asset_image_path"))
-        validate_create_metadata(merged)
+        has_asset_image = bool(row.get("asset_image_path"))
+        merged["_has_asset_image"] = has_asset_image
+        validate_create_metadata(merged, require_asset_image=False)
 
         asset_image = None
         barcode_image = None
@@ -945,11 +1053,15 @@ class SaasAssetsRepository:
             }
         ).eq("id", row["id"]).execute()
 
-        self._table("registered_assets").update({"ai_status": "analyzing"}).eq(
-            "id", created["id"]
-        ).execute()
-
-        self._table("registered_assets").update({"ai_status": "analyzing"}).eq(
+        initial_ai_status = "pending"
+        if has_asset_image:
+            if auto_analyze:
+                initial_ai_status = "analyzing"
+            elif skip_ai:
+                initial_ai_status = "ai_disabled"
+            else:
+                initial_ai_status = "pending"
+        self._table("registered_assets").update({"ai_status": initial_ai_status}).eq(
             "id", created["id"]
         ).execute()
 
@@ -960,13 +1072,13 @@ class SaasAssetsRepository:
             asset_id=created["id"],
             assetname=created.get("assetname"),
             assetid=created.get("assetid"),
-            ai_status="analyzing",
+            ai_status=initial_ai_status,
         )
 
         return CompleteAssetSessionResponse(
             asset_id=created["id"],
             assetid=created["assetid"],
-            ai_status="analyzing",
+            ai_status=initial_ai_status,
         )
 
     async def update_asset(
@@ -1058,16 +1170,17 @@ class SaasAssetsRepository:
 
         return self._summary_from_row(row)
 
-    async def apply_session_images_to_asset(
+    async def load_session_images_for_asset(
         self, user_id: int, asset_id: str, session_token: str
-    ) -> SaasAssetSummary | None:
+    ) -> tuple[bytes, bytes | None]:
         return await asyncio.to_thread(
-            self._apply_session_images_to_asset_sync, user_id, asset_id, session_token
+            self._load_session_images_for_asset_sync, user_id, asset_id, session_token
         )
 
-    def _apply_session_images_to_asset_sync(
+    def _load_session_images_for_asset_sync(
         self, user_id: int, asset_id: str, session_token: str
-    ) -> SaasAssetSummary | None:
+    ) -> tuple[bytes, bytes | None]:
+        del user_id  # validated via asset_id match in session draft
         session = self._fetch_session_by_token_sync(session_token)
         if not session:
             raise ValueError("Session not found")
@@ -1089,7 +1202,21 @@ class SaasAssetsRepository:
             barcode_image = self._download_bytes(session["barcode_image_path"])
         if not asset_image:
             raise ValueError("Session has no asset image")
+        return asset_image, barcode_image
 
+    async def apply_session_images_to_asset(
+        self, user_id: int, asset_id: str, session_token: str
+    ) -> SaasAssetSummary | None:
+        return await asyncio.to_thread(
+            self._apply_session_images_to_asset_sync, user_id, asset_id, session_token
+        )
+
+    def _apply_session_images_to_asset_sync(
+        self, user_id: int, asset_id: str, session_token: str
+    ) -> SaasAssetSummary | None:
+        asset_image, barcode_image = self._load_session_images_for_asset_sync(
+            user_id, asset_id, session_token
+        )
         return self._update_asset_sync(
             user_id,
             asset_id,
@@ -1195,6 +1322,36 @@ class SaasAssetsRepository:
                 count += 1
         return count
 
+    async def clear_all_analyses(self, user_id: int) -> dict[str, int]:
+        return await asyncio.to_thread(self._clear_all_analyses_sync, user_id)
+
+    def _clear_all_analyses_sync(self, user_id: int) -> dict[str, int]:
+        assets_result = (
+            self._table("registered_assets")
+            .select("id, ai_status")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        asset_rows = assets_result.data or []
+        asset_ids = [row["id"] for row in asset_rows]
+        analyses_deleted = 0
+        if asset_ids:
+            for aid in asset_ids:
+                del_result = (
+                    self._table("asset_analyses").delete().eq("asset_id", aid).execute()
+                )
+                analyses_deleted += len(del_result.data or [])
+
+        assets_reset = 0
+        for row in asset_rows:
+            current = row.get("ai_status") or "pending"
+            if current in ("pass", "fail", "error", "analyzing"):
+                self._table("registered_assets").update({"ai_status": "pending"}).eq(
+                    "id", row["id"]
+                ).execute()
+                assets_reset += 1
+        return {"analyses_deleted": analyses_deleted, "assets_reset": assets_reset}
+
     async def bulk_analyze(self, user_id: int, asset_ids: list[str]) -> list[str]:
         return await asyncio.to_thread(self._bulk_analyze_sync, user_id, asset_ids)
 
@@ -1245,6 +1402,8 @@ class SaasAssetsRepository:
                 stats["error"] += 1
             elif status == "analyzing":
                 stats["analyzing"] += 1
+            elif status == "ai_disabled":
+                stats["pending"] += 1
             else:
                 stats["pending"] += 1
         return stats

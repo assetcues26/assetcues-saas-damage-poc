@@ -80,6 +80,48 @@ def test_list_assets_success(saas_settings):
     assert body["items"][0]["assetid"] == "AST-10001"
 
 
+def test_next_asset_identifiers(saas_settings):
+    mock_repo = MagicMock()
+    mock_repo.enabled = True
+    mock_repo.get_next_asset_identifiers = AsyncMock(
+        return_value={
+            "assetid": "AST-10006",
+            "assetnumber": "FAR1006",
+        }
+    )
+
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: saas_settings
+    app.dependency_overrides[get_repo] = lambda: mock_repo
+    client = TestClient(app)
+
+    response = client.get("/v1/saas/assets/next-identifiers")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["assetid"] == "AST-10006"
+    assert body["assetnumber"] == "FAR1006"
+    assert "tagnumber" not in body
+
+
+def test_clear_all_analyses(saas_settings):
+    mock_repo = MagicMock()
+    mock_repo.enabled = True
+    mock_repo.clear_all_analyses = AsyncMock(
+        return_value={"analyses_deleted": 5, "assets_reset": 3}
+    )
+
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: saas_settings
+    app.dependency_overrides[get_repo] = lambda: mock_repo
+    client = TestClient(app)
+
+    response = client.delete("/v1/saas/analyses")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["analyses_deleted"] == 5
+    assert body["assets_reset"] == 3
+
+
 def test_create_asset_session_success(saas_settings):
     mock_repo = MagicMock()
     mock_repo.enabled = True
@@ -102,6 +144,32 @@ def test_create_asset_session_success(saas_settings):
     assert response.json()["session_token"].startswith("tok")
 
 
+def test_save_asset_session_draft(saas_settings):
+    mock_repo = MagicMock()
+    mock_repo.enabled = True
+    mock_repo.update_asset_session_draft = AsyncMock(
+        return_value=AssetCreateSessionDetail(
+            session_token="a" * 32,
+            status="active",
+            draft_json={"assetname": "Laptop", "_mobile_step": "photos"},
+            expires_at="2026-12-31T00:00:00Z",
+        )
+    )
+
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: saas_settings
+    app.dependency_overrides[get_repo] = lambda: mock_repo
+    client = TestClient(app)
+
+    token = "a" * 32
+    response = client.patch(
+        f"/v1/saas/asset-sessions/{token}/draft",
+        json={"draft_json": {"assetname": "Laptop", "_mobile_step": "photos"}},
+    )
+    assert response.status_code == 200
+    mock_repo.update_asset_session_draft.assert_awaited_once()
+
+
 def test_get_session_completed_returns_410(saas_settings):
     mock_repo = MagicMock()
     mock_repo.enabled = True
@@ -117,7 +185,7 @@ def test_get_session_completed_returns_410(saas_settings):
     assert response.status_code == 410
 
 
-def test_analyze_asset_triggers_background(saas_settings):
+def test_analyze_asset_runs_inline(saas_settings):
     mock_repo = MagicMock()
     mock_repo.enabled = True
     mock_repo.get_asset = AsyncMock(
@@ -126,18 +194,17 @@ def test_analyze_asset_triggers_background(saas_settings):
             latest_analysis=None,
         )
     )
-    mock_repo.set_ai_status = AsyncMock()
+    mock_repo.run_analysis = AsyncMock(return_value="pass")
 
     app = create_app()
     app.dependency_overrides[get_settings] = lambda: saas_settings
     app.dependency_overrides[get_repo] = lambda: mock_repo
     client = TestClient(app)
 
-    with patch("app.api.v1.saas_assets._background_analyze", new_callable=AsyncMock):
-        response = client.post(f"/v1/saas/assets/{TEST_ASSET_ID}/analyze")
+    response = client.post(f"/v1/saas/assets/{TEST_ASSET_ID}/analyze")
     assert response.status_code == 200
-    assert response.json()["ai_status"] == "analyzing"
-    mock_repo.set_ai_status.assert_awaited_once()
+    assert response.json()["ai_status"] == "pass"
+    mock_repo.run_analysis.assert_awaited_once()
 
 
 def test_validate_create_metadata_required_fields():
@@ -208,6 +275,9 @@ def test_lookups_success(saas_settings):
     body = response.json()
     assert body["type"] == "company"
     assert isinstance(body["items"], list)
+    labels = [item["label"] for item in body["items"]]
+    assert "AssetCues Demo Corp" in labels
+    assert not any("Flipkart" in label or "Infosys" in label for label in labels)
 
 
 def test_dashboard_stats_success(saas_settings):
@@ -357,20 +427,24 @@ def test_analyze_with_metadata_patch(saas_settings):
             latest_analysis=None,
         )
     )
-    mock_repo.set_ai_status = AsyncMock()
+    mock_repo.run_analysis = AsyncMock(return_value="pass")
 
     app = create_app()
     app.dependency_overrides[get_settings] = lambda: saas_settings
     app.dependency_overrides[get_repo] = lambda: mock_repo
     client = TestClient(app)
 
-    with patch("app.api.v1.saas_assets._background_analyze", new_callable=AsyncMock) as bg:
-        response = client.post(
-            f"/v1/saas/assets/{TEST_ASSET_ID}/analyze",
-            json={"metadata_patch": {"cost": "130000"}},
-        )
+    response = client.post(
+        f"/v1/saas/assets/{TEST_ASSET_ID}/analyze",
+        json={"metadata_patch": {"cost": "130000"}},
+    )
     assert response.status_code == 200
-    bg.assert_awaited_once()
+    assert response.json()["ai_status"] == "pass"
+    mock_repo.run_analysis.assert_awaited_once_with(
+        saas_settings.demo_user_id,
+        TEST_ASSET_ID,
+        {"cost": "130000"},
+    )
 
 
 def test_upload_asset_images_success(saas_settings):
@@ -432,9 +506,8 @@ def test_upload_asset_images_from_session_token(saas_settings):
     mock_repo.get_asset = AsyncMock(
         return_value=SaasAssetDetailResponse(asset=_asset_summary(), latest_analysis=None)
     )
-    mock_repo.apply_session_images_to_asset = AsyncMock(
-        return_value=_asset_summary(ai_status="analyzing")
-    )
+    mock_repo.load_session_images_for_asset = AsyncMock(return_value=(b"asset-bytes", None))
+    mock_repo.update_asset = AsyncMock(return_value=_asset_summary(ai_status="analyzing"))
     mock_repo.log_activity = AsyncMock()
     mock_repo.set_ai_status = AsyncMock()
     mock_repo.get_asset.side_effect = [
@@ -457,8 +530,48 @@ def test_upload_asset_images_from_session_token(saas_settings):
         )
 
     assert response.status_code == 200
-    mock_repo.apply_session_images_to_asset.assert_awaited_once()
-    mock_repo.update_asset.assert_not_called()
+    mock_repo.load_session_images_for_asset.assert_awaited_once()
+    mock_repo.update_asset.assert_awaited_once()
+    bg.assert_awaited_once()
+
+
+def test_upload_asset_images_merges_session_with_barcode_file(saas_settings):
+    mock_repo = MagicMock()
+    mock_repo.enabled = True
+    mock_repo.get_asset = AsyncMock(
+        return_value=SaasAssetDetailResponse(asset=_asset_summary(), latest_analysis=None)
+    )
+    mock_repo.load_session_images_for_asset = AsyncMock(
+        return_value=(b"session-asset", b"session-barcode")
+    )
+    mock_repo.update_asset = AsyncMock(return_value=_asset_summary(ai_status="analyzing"))
+    mock_repo.log_activity = AsyncMock()
+    mock_repo.set_ai_status = AsyncMock()
+    mock_repo.get_asset.side_effect = [
+        SaasAssetDetailResponse(asset=_asset_summary(), latest_analysis=None),
+        SaasAssetDetailResponse(
+            asset=_asset_summary(ai_status="analyzing"),
+            latest_analysis=None,
+        ),
+    ]
+
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: saas_settings
+    app.dependency_overrides[get_repo] = lambda: mock_repo
+    client = TestClient(app)
+
+    token = "b" * 32
+    with patch("app.api.v1.saas_assets._background_analyze", new_callable=AsyncMock) as bg:
+        response = client.post(
+            f"/v1/saas/assets/{TEST_ASSET_ID}/images?session_token={token}",
+            files={"barcodeimage": ("barcode.jpg", b"local-barcode", "image/jpeg")},
+        )
+
+    assert response.status_code == 200
+    mock_repo.load_session_images_for_asset.assert_awaited_once()
+    update_kwargs = mock_repo.update_asset.await_args.kwargs
+    assert update_kwargs["asset_image"] == b"session-asset"
+    assert update_kwargs["barcode_image"] == b"local-barcode"
     bg.assert_awaited_once()
 
 

@@ -8,6 +8,22 @@ export function isPass(value) {
 }
 
 /**
+ * Y/N image readability from uploads when AI returns an unknown value (e.g. E).
+ * @param {object | null | undefined} data
+ * @param {object | null | undefined} [asset]
+ */
+export function resolveImageReadability(data, asset = null) {
+  const raw = data?.imageReadability;
+  if (raw === 'Y' || raw === 'N') return raw;
+
+  const hasAsset = Boolean(asset?.asset_image_url || asset?.asset_image_path);
+  const hasBarcode = Boolean(asset?.barcode_image_url || asset?.barcode_image_path);
+  if (hasAsset && hasBarcode) return 'Y';
+  if (!hasAsset && !hasBarcode) return 'N';
+  return 'Y';
+}
+
+/**
  * @param {object | null | undefined} response
  * @param {object | null | undefined} [asset]
  */
@@ -16,12 +32,13 @@ export function buildAnalysisReport(response, asset = null) {
   const cost = data.costvalidation || {};
   const date = data.acquisitiondatevalidation || {};
   const barcode = data.barcodeposition || {};
+  const imageReadability = resolveImageReadability(data, asset);
 
   const checks = [
     {
       key: 'imageReadability',
       label: CHECK_LABELS.imageReadability,
-      pass: isPass(data.imageReadability),
+      pass: isPass(imageReadability),
       percent: null,
     },
     {
@@ -68,7 +85,7 @@ export function buildAnalysisReport(response, asset = null) {
     condition: data.condition,
     imageAnalysis: data.imageAnalysis,
     damageAssessment: data.damage_assessment,
-    imageReadability: data.imageReadability,
+    imageReadability,
     identityReasoning: data.reasoning,
     recommendedSubcategory: data.recommendedsubcategory,
     recommendedMakeModel: data.recommendedmakemodel,

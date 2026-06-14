@@ -87,20 +87,11 @@
     { "id": "mm-godrej-chair", "name": "Godrej Interio Chair", "subcategoryid": "sub-exec-chair" }
   ],
   "company": [
-    { "id": "1000", "name": "Tech Co India Pvt Ltd" },
-    { "id": "2000", "name": "Global Manufacturing Ltd" },
-    { "id": "3000", "name": "AssetCues Demo Corp" },
-    { "id": "4000", "name": "Flipkart Internet Pvt Ltd" },
-    { "id": "5000", "name": "Infosys Ltd" },
-    { "id": "6000", "name": "Tata Consultancy Services" },
-    { "id": "7000", "name": "Reliance Industries Ltd" },
-    { "id": "8000", "name": "HDFC Bank Ltd" },
-    { "id": "9000", "name": "Wipro Ltd" },
-    { "id": "10000", "name": "Mahindra & Mahindra" },
-    { "id": "11000", "name": "Bharti Airtel Ltd" },
-    { "id": "12000", "name": "Asian Paints Ltd" },
-    { "id": "13000", "name": "Larsen & Toubro Ltd" },
-    { "id": "14000", "name": "HCL Technologies Ltd" },
-    { "id": "15000", "name": "Sun Pharma Industries" }
+    { "id": "1000", "name": "AssetCues Demo Corp" },
+    { "id": "2000", "name": "Demo Company Alpha" },
+    { "id": "3000", "name": "Demo Company Beta" },
+    { "id": "4000", "name": "Demo Company Gamma" },
+    { "id": "5000", "name": "Demo Company Delta" },
+    { "id": "6000", "name": "Demo Company Epsilon" }
   ]
 }

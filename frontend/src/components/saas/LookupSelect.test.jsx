@@ -77,4 +77,60 @@ describe('LookupSelect', () => {
       'Lab Equipment',
     );
   });
+
+  it('shows selected id after choosing an option', async () => {
+    const onChange = vi.fn();
+    render(
+      <LookupSelect
+        type="company"
+        value="2000"
+        label="Company 1"
+        onChange={onChange}
+        placeholder="Select company"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toBeEnabled();
+    });
+
+    expect(screen.getByText('2000')).toBeInTheDocument();
+  });
+
+  it('persists custom company with auto id', async () => {
+    const storage = {};
+    vi.stubGlobal('localStorage', {
+      getItem: (key) => storage[key] ?? null,
+      setItem: (key, value) => {
+        storage[key] = value;
+      },
+    });
+
+    const onChange = vi.fn();
+    render(
+      <LookupSelect
+        type="company"
+        value=""
+        onChange={onChange}
+        placeholder="Select company"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toBeEnabled();
+    });
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: CUSTOM_LOOKUP_VALUE } });
+    fireEvent.change(screen.getByPlaceholderText('Enter custom name'), {
+      target: { value: 'My Custom Co' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add custom' }));
+
+    expect(onChange).toHaveBeenCalledWith('8000', 'My Custom Co');
+    expect(JSON.parse(storage.saas_custom_lookups).company).toEqual(
+      expect.arrayContaining([{ id: '8000', name: 'My Custom Co', label: 'My Custom Co' }]),
+    );
+
+    vi.unstubAllGlobals();
+  });
 });

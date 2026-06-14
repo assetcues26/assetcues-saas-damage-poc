@@ -7,6 +7,11 @@ const STATUS_VARIANT = {
   pass: 'success',
   fail: 'danger',
   error: 'warning',
+  ai_disabled: 'warning',
+};
+
+const STATUS_LABEL = {
+  ai_disabled: 'AI OFF',
 };
 
 /**
@@ -31,7 +36,7 @@ export function AiStatusBadge({ status, onClick }) {
     >
       <Badge variant={variant} className="inline-flex items-center gap-1 whitespace-nowrap">
         {normalized === 'analyzing' && <Spinner className="h-3 w-3" />}
-        {normalized.toUpperCase()}
+        {STATUS_LABEL[normalized] || normalized.toUpperCase()}
       </Badge>
     </Tag>
   );

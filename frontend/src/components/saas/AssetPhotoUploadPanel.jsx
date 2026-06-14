@@ -55,7 +55,7 @@ export function AssetPhotoUploadPanel({
       <div className="flex flex-1 flex-col">
         <DropZone
           embedded
-          inputId="saas-asset-image-upload"
+          inputId="assetcues-asset-image-upload"
           title={assetPreview ? 'Asset image added' : 'Click to upload or drag and drop'}
           subtitle="Main asset photo — JPEG, PNG, or WebP"
           browseLabel="Browse asset photo"
@@ -80,7 +80,7 @@ export function AssetPhotoUploadPanel({
           </div>
           <DropZone
             embedded
-            inputId="saas-barcode-image-upload"
+            inputId="assetcues-barcode-image-upload"
             title={barcodePreview ? 'Barcode image added' : 'Add barcode / tag photo'}
             subtitle="Optional — JPEG, PNG, or WebP"
             browseLabel="Browse barcode"

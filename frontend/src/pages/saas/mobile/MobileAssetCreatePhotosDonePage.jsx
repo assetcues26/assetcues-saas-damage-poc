@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { CheckCircle2, Monitor } from 'lucide-react';
 import { MobileAssetPageLayout } from '../../../components/saas/mobile/MobileAssetPageLayout';
+import { MobileBrandHeader } from '../../../components/saas/mobile/MobileBrandHeader';
 import { useAssetCreateSession } from '../../../hooks/useAssetCreateSession';
 
 export function MobileAssetCreatePhotosDonePage() {
@@ -15,6 +16,7 @@ export function MobileAssetCreatePhotosDonePage() {
       onBack={() => navigate(`/assets/create/mobile/${token}/photos`)}
       wrapperClassName="flex flex-col items-center py-12 text-center"
     >
+      <MobileBrandHeader className="mb-6" />
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-600">
         <CheckCircle2 size={32} />
       </div>

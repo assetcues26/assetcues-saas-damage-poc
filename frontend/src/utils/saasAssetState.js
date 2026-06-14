@@ -1,16 +1,8 @@
-/** Clear stale AI check fields while a new analysis is running. */
+/** Mark asset as analyzing while keeping the last known AI check results visible. */
 export function withAnalyzingState(asset) {
   return {
     ...asset,
     ai_status: 'analyzing',
-    namedescriptionmatch: null,
-    subcatmodelmatch: null,
-    detectedtagnumbermatch: null,
-    costmatch: null,
-    datematch: null,
-    detected_asset: null,
-    condition: null,
-    failure_summary: null,
   };
 }
 

@@ -40,6 +40,9 @@ export function applyAssetFormPrefs(values) {
   if (prefs.companyid && prefs.company) {
     next.companyid = prefs.companyid;
     next.company = prefs.company;
+    if (!String(next.customerid || '').trim()) {
+      next.customerid = prefs.companyid;
+    }
   }
   if (prefs.assetclassid && prefs.assetclassname) {
     next.assetclassid = prefs.assetclassid;

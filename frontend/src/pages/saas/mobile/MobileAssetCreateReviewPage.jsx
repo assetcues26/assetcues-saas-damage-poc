@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MobileAssetPageLayout } from '../../../components/saas/mobile/MobileAssetPageLayout';
+import { AssetFormFields } from '../../../components/saas/AssetFormFields';
 import { useAssetCreateSession } from '../../../hooks/useAssetCreateSession';
 import {
-  ASSET_FORM_FIELDS,
   EMPTY_ASSET_FORM,
   assetFormToPayload,
+  mergeFormWithDraft,
   validateAssetForm,
 } from '../../../components/saas/assetFormConfig';
 
@@ -17,11 +18,12 @@ export function MobileAssetCreateReviewPage() {
   const [values, setValues] = useState({ ...EMPTY_ASSET_FORM });
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const draftHydratedRef = useRef(false);
 
   useEffect(() => {
-    if (session?.draft_json) {
-      setValues((prev) => ({ ...prev, ...session.draft_json }));
-    }
+    if (!session?.draft_json || draftHydratedRef.current) return;
+    draftHydratedRef.current = true;
+    setValues((prev) => mergeFormWithDraft(prev, session.draft_json));
   }, [session?.draft_json]);
 
   const submit = async (e) => {
@@ -60,20 +62,13 @@ export function MobileAssetCreateReviewPage() {
           <img src={session.barcode_image_url} alt="Barcode" className="h-24 rounded-xl border object-cover" />
         )}
 
-        {ASSET_FORM_FIELDS.map((field) => (
-          <div key={field.key}>
-            <label className="text-xs font-medium text-gray-700">
-              {field.label}
-              {field.required && ' *'}
-            </label>
-            <input
-              type={field.type || 'text'}
-              value={values[field.key]}
-              onChange={(e) => setValues((p) => ({ ...p, [field.key]: e.target.value }))}
-              className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm shadow-sm"
-            />
-          </div>
-        ))}
+        <AssetFormFields
+          values={values}
+          onChange={(key, val) => setValues((p) => ({ ...p, [key]: val }))}
+          onPatch={(patch) => setValues((p) => ({ ...p, ...patch }))}
+          compact
+          hideAssetId
+        />
 
         {(error || sessionError) && (
           <p className="text-sm text-red-600">{error || sessionError}</p>

@@ -26,6 +26,7 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
   const [sessionBarcodeUrl, setSessionBarcodeUrl] = useState(null);
   const [sessionToken, setSessionToken] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadPhase, setUploadPhase] = useState(null);
   const [error, setError] = useState(null);
 
   const sessionDraft = useMemo(
@@ -86,9 +87,14 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
   );
 
   const hasAssetImage = Boolean(assetFile || sessionAssetUrl);
-  const useSessionUpload = Boolean(sessionToken && sessionAssetUrl && !assetFile);
   const displayAssetPreview = assetPreview || sessionAssetUrl;
   const displayBarcodePreview = barcodePreview || sessionBarcodeUrl;
+
+  const uploadButtonLabel = (() => {
+    if (!uploading) return 'Upload & run AI';
+    if (uploadPhase === 'preparing') return 'Preparing photos…';
+    return 'Uploading…';
+  })();
 
   const handleUpload = async () => {
     if (!hasAssetImage) {
@@ -96,21 +102,21 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
       return;
     }
     setUploading(true);
+    setUploadPhase(null);
     setError(null);
-    onAnalyzing?.();
     try {
-      if (useSessionUpload) {
-        await uploadSaasAssetImages(
-          assetId,
-          {},
-          { sessionToken },
-        );
-      } else {
-        await uploadSaasAssetImages(assetId, {
+      await uploadSaasAssetImages(
+        assetId,
+        {
           assetImage: assetFile || undefined,
           barcodeImage: barcodeFile || undefined,
-        });
-      }
+        },
+        {
+          sessionToken: sessionToken || undefined,
+          onProgress: setUploadPhase,
+        },
+      );
+      onAnalyzing?.();
       showToast(
         `Photos saved for ${assetName || 'asset'} — AI analysis started`,
         'success',
@@ -125,6 +131,7 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
       setError(e instanceof Error ? e.message : 'Upload failed');
     } finally {
       setUploading(false);
+      setUploadPhase(null);
     }
   };
 
@@ -162,7 +169,7 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Button variant="primary" disabled={uploading || !hasAssetImage} onClick={handleUpload}>
-          {uploading ? 'Uploading…' : 'Upload & run AI'}
+          {uploadButtonLabel}
         </Button>
         <p className="text-xs text-amber-800/70">
           Asset photo required · barcode optional · computer or mobile

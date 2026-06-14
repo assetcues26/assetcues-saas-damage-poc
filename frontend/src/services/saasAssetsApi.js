@@ -1,8 +1,10 @@
 import { ASSET_ANALYSIS_API_BASE } from '../config/api';
 import { formatApiErrorMessage } from '../utils/apiErrorMessage';
 import { prepareSaasPhotoForUpload } from '../utils/imageCompression';
+import { withUploadRetries } from '../utils/uploadRetry';
 
 const SAAS_BASE = `${ASSET_ANALYSIS_API_BASE}/v1/saas`;
+const UPLOAD_TIMEOUT_MS = 120_000;
 
 function saasHeaders() {
   const headers = { Accept: 'application/json' };
@@ -59,23 +61,66 @@ export async function fetchSaasAsset(assetId) {
   return body;
 }
 
-async function prepareSaasUploadFiles(files = {}) {
+async function prepareSaasUploadFiles(files = {}, onProgress) {
   const prepared = {};
   if (files.assetImage) {
+    onProgress?.('preparing');
     prepared.assetImage = await prepareSaasPhotoForUpload(files.assetImage);
   }
   if (files.barcodeImage) {
+    onProgress?.('preparing');
     prepared.barcodeImage = await prepareSaasPhotoForUpload(files.barcodeImage);
   }
   return prepared;
+}
+
+function formatUploadNetworkError(err) {
+  if (err?.name === 'AbortError') {
+    return 'Upload timed out — try a smaller photo or check your connection.';
+  }
+  if (err?.name === 'TypeError') {
+    const base = ASSET_ANALYSIS_API_BASE;
+    return `Cannot reach the API (${base}) — check that the backend is running and VITE_ASSET_ANALYSIS_API_BASE is correct.`;
+  }
+  return err instanceof Error ? err.message : 'Upload failed';
+}
+
+async function postSaasUpload(url, requestBody, onProgress) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+  onProgress?.('uploading');
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: saasHeaders(),
+      body: requestBody,
+      signal: controller.signal,
+    });
+    const body = await parseJsonResponse(response);
+    if (!response.ok) {
+      if (response.status === 404 || response.status === 405) {
+        throw new Error(
+          'Photo upload API is unavailable — restart the backend (port 8000) or redeploy the latest backend on Vercel.',
+        );
+      }
+      throw new Error(formatApiErrorMessage(body, response.status));
+    }
+    return body;
+  } catch (err) {
+    throw new Error(formatUploadNetworkError(err));
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /**
  * @param {Record<string, string|number|undefined>} metadata
  * @param {File} assetImage
  * @param {File} [barcodeImage]
+ * @param {{ autoAnalyze?: boolean, skipAi?: boolean }} [options]
  */
-export async function createSaasAsset(metadata, assetImage, barcodeImage) {
+export async function createSaasAsset(metadata, assetImage, barcodeImage, options = {}) {
   const compressedAsset = await prepareSaasPhotoForUpload(assetImage);
   const compressedBarcode = barcodeImage
     ? await prepareSaasPhotoForUpload(barcodeImage)
@@ -92,7 +137,15 @@ export async function createSaasAsset(metadata, assetImage, barcodeImage) {
     form.append('barcodeimage', compressedBarcode);
   }
 
-  const response = await fetch(`${SAAS_BASE}/assets`, {
+  const search = new URLSearchParams();
+  if (options.autoAnalyze === false) {
+    search.set('auto_analyze', 'false');
+  }
+  if (options.skipAi) {
+    search.set('skip_ai', 'true');
+  }
+
+  const response = await fetch(`${SAAS_BASE}/assets?${search}`, {
     method: 'POST',
     headers: saasHeaders(),
     body: form,
@@ -167,6 +220,26 @@ export async function fetchAssetCreateSession(token) {
 
 /**
  * @param {string} token
+ * @param {Record<string, unknown>} draftJson
+ */
+export async function saveAssetCreateSessionDraft(token, draftJson) {
+  const response = await fetch(
+    `${SAAS_BASE}/asset-sessions/${encodeURIComponent(token)}/draft`,
+    {
+      method: 'PATCH',
+      headers: { ...saasHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ draft_json: draftJson }),
+    },
+  );
+  const body = await parseJsonResponse(response);
+  if (!response.ok) {
+    throw new Error(formatApiErrorMessage(body, response.status));
+  }
+  return body;
+}
+
+/**
+ * @param {string} token
  * @param {'assetimage'|'barcodeimage'} fieldName
  * @param {File} file
  */
@@ -193,8 +266,9 @@ export async function uploadAssetCreateSessionImage(token, fieldName, file) {
 /**
  * @param {string} token
  * @param {Record<string, string|number|undefined>} metadata
+ * @param {{ autoAnalyze?: boolean, skipAi?: boolean }} [options]
  */
-export async function completeAssetCreateSession(token, metadata) {
+export async function completeAssetCreateSession(token, metadata, options = {}) {
   const form = new FormData();
   Object.entries(metadata).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
@@ -202,8 +276,16 @@ export async function completeAssetCreateSession(token, metadata) {
     }
   });
 
+  const search = new URLSearchParams();
+  if (options.autoAnalyze === false) {
+    search.set('auto_analyze', 'false');
+  }
+  if (options.skipAi) {
+    search.set('skip_ai', 'true');
+  }
+
   const response = await fetch(
-    `${SAAS_BASE}/asset-sessions/${encodeURIComponent(token)}/complete`,
+    `${SAAS_BASE}/asset-sessions/${encodeURIComponent(token)}/complete?${search}`,
     {
       method: 'POST',
       headers: saasHeaders(),
@@ -230,6 +312,30 @@ export async function fetchLookups(type, parentId) {
 
 export async function fetchDashboardStats() {
   const response = await fetch(`${SAAS_BASE}/assets/stats`, { headers: saasHeaders() });
+  const body = await parseJsonResponse(response);
+  if (!response.ok) {
+    throw new Error(formatApiErrorMessage(body, response.status));
+  }
+  return body;
+}
+
+/**
+ * @returns {Promise<{ assetid: string, assetnumber: string }>}
+ */
+export async function fetchNextAssetIdentifiers() {
+  const response = await fetch(`${SAAS_BASE}/assets/next-identifiers`, { headers: saasHeaders() });
+  const body = await parseJsonResponse(response);
+  if (!response.ok) {
+    throw new Error(formatApiErrorMessage(body, response.status));
+  }
+  return body;
+}
+
+export async function clearAllSaasAnalyses() {
+  const response = await fetch(`${SAAS_BASE}/analyses`, {
+    method: 'DELETE',
+    headers: saasHeaders(),
+  });
   const body = await parseJsonResponse(response);
   if (!response.ok) {
     throw new Error(formatApiErrorMessage(body, response.status));
@@ -276,7 +382,7 @@ export async function updateSaasAsset(assetId, metadata, options = {}) {
 /**
  * @param {string} assetId
  * @param {{ assetImage?: File, barcodeImage?: File }} files
- * @param {{ reanalyze?: boolean, sessionToken?: string }} [options]
+ * @param {{ reanalyze?: boolean, sessionToken?: string, onProgress?: (phase: 'preparing' | 'uploading') => void }} [options]
  */
 export async function uploadSaasAssetImages(assetId, files, options = {}) {
   const search = new URLSearchParams();
@@ -284,35 +390,26 @@ export async function uploadSaasAssetImages(assetId, files, options = {}) {
   if (options.sessionToken) search.set('session_token', options.sessionToken);
 
   const hasFiles = Boolean(files?.assetImage || files?.barcodeImage);
+  const hasSession = Boolean(options.sessionToken);
+  if (!hasFiles && !hasSession) {
+    throw new Error('No photos to upload — add an asset image first.');
+  }
+
   const query = search.toString() ? `?${search}` : '';
+  const url = `${SAAS_BASE}/assets/${encodeURIComponent(assetId)}/images${query}`;
 
-  let requestBody;
-  if (hasFiles) {
-    const prepared = await prepareSaasUploadFiles(files);
-    const form = new FormData();
-    if (prepared.assetImage) form.append('assetimage', prepared.assetImage);
-    if (prepared.barcodeImage) form.append('barcodeimage', prepared.barcodeImage);
-    requestBody = form;
-  }
-
-  const response = await fetch(
-    `${SAAS_BASE}/assets/${encodeURIComponent(assetId)}/images${query}`,
-    {
-      method: 'POST',
-      headers: saasHeaders(),
-      body: requestBody,
-    },
-  );
-  const body = await parseJsonResponse(response);
-  if (!response.ok) {
-    if (response.status === 404 || response.status === 405) {
-      throw new Error(
-        'Photo upload API is unavailable — restart the backend (port 8000) or redeploy the latest backend on Vercel.',
-      );
+  return withUploadRetries(async () => {
+    let requestBody;
+    if (hasFiles) {
+      const prepared = await prepareSaasUploadFiles(files, options.onProgress);
+      const form = new FormData();
+      if (prepared.assetImage) form.append('assetimage', prepared.assetImage);
+      if (prepared.barcodeImage) form.append('barcodeimage', prepared.barcodeImage);
+      requestBody = form;
     }
-    throw new Error(formatApiErrorMessage(body, response.status));
-  }
-  return body;
+
+    return postSaasUpload(url, requestBody, options.onProgress);
+  });
 }
 
 /**

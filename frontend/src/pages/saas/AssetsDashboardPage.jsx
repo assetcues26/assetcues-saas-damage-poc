@@ -18,6 +18,7 @@ import {
 } from '../../services/saasAssetsApi';
 import { exportSaasAssetReportPdf } from '../../services/exportSaasAssetReportPdf';
 import { AiStatusBadge, MatchBadge } from '../../components/saas/AiStatusBadge';
+import { AssetThumbnail } from '../../components/saas/AssetThumbnail';
 import { FailureDetailModal } from '../../components/saas/FailureDetailModal';
 import { AnalysisDetailModal } from '../../components/saas/AnalysisDetailModal';
 import { useApp } from '../../context/AppContext';
@@ -159,7 +160,7 @@ export function AssetsDashboardPage() {
     setBulkBusy(true);
     try {
       await bulkAnalyze();
-      showToast('AI re-run started for selected assets', 'success');
+      showToast('AI analysis queued for selected assets', 'success');
     } finally {
       setBulkBusy(false);
     }
@@ -251,7 +252,7 @@ export function AssetsDashboardPage() {
         <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
           <span className="text-sm font-medium text-blue-900">{selectedIds.length} selected</span>
           <Button variant="outline" size="sm" disabled={bulkBusy} onClick={handleBulkAnalyze}>
-            Re-run AI
+            Run AI analysis
           </Button>
           <Button variant="outline" size="sm" disabled={bulkBusy} onClick={() => exportCsv()}>
             <Download size={14} className="mr-1" />
@@ -316,15 +317,10 @@ export function AssetsDashboardPage() {
                       />
                     </td>
                     <td className="px-3 py-3">
-                      {asset.asset_image_url ? (
-                        <img
-                          src={asset.asset_image_url}
-                          alt=""
-                          className="h-10 w-10 rounded border object-cover"
-                        />
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
+                      <AssetThumbnail
+                        src={asset.asset_image_url}
+                        alt={asset.assetname || asset.assetid}
+                      />
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 font-medium text-gray-900">
                       <Link to={`/assets/${asset.id}`} className="hover:text-blue-600">
@@ -380,8 +376,8 @@ export function AssetsDashboardPage() {
                         )}
                         <RowAction
                           icon={RefreshCw}
-                          label="Re-run AI"
-                          disabled={rerunningId === asset.id}
+                          label="Run AI"
+                          disabled={rerunningId === asset.id || !asset.asset_image_url}
                           onClick={() => handleRerun(asset.id)}
                         />
                         <RowAction

@@ -1,36 +1,49 @@
 import { useRef } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MobileAssetPageLayout } from '../../../components/saas/mobile/MobileAssetPageLayout';
+import { MobileBrandHeader } from '../../../components/saas/mobile/MobileBrandHeader';
+import { MobilePhotoPreviewGrid } from '../../../components/saas/mobile/MobilePhotoActions';
 import { useAssetCreateSession } from '../../../hooks/useAssetCreateSession';
+import { mobileCreateRoutes, resolveMobileCreateMode } from '../../../utils/mobileCreateRoutes';
 
 export function MobileAssetCreateUploadPage() {
   const { token } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
-  const isPhotosFlow = location.pathname.includes('/photos/');
   const { session, uploadImage, uploading, error } = useAssetCreateSession(token);
   const assetRef = useRef(null);
   const barcodeRef = useRef(null);
 
-  const hasAsset = Boolean(session?.asset_image_url);
-  const backPath = isPhotosFlow
-    ? `/assets/create/mobile/${token}/photos`
-    : `/assets/create/mobile/${token}`;
-  const donePath = isPhotosFlow
-    ? `/assets/create/mobile/${token}/photos/done`
-    : `/assets/create/mobile/${token}`;
+  const mode = resolveMobileCreateMode(session?.draft_json);
+  const routes = mobileCreateRoutes(token, mode);
+
+  const pickAsset = () => assetRef.current?.click();
+  const pickBarcode = () => barcodeRef.current?.click();
 
   return (
     <MobileAssetPageLayout
-      title="Upload"
-      onBack={() => navigate(backPath)}
-      wrapperClassName="flex flex-1 flex-col gap-4 py-6"
+      title="Upload photos"
+      onBack={() => navigate(routes.photos)}
+      wrapperClassName="flex flex-1 flex-col gap-5 py-6 pb-10"
     >
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-        <p className="text-sm font-medium text-gray-900">Asset image</p>
-        <Button className="mt-2 w-full" onClick={() => assetRef.current?.click()} disabled={uploading}>
-          Choose asset photo
+      <MobileBrandHeader
+        title="Upload photos"
+        subtitle="Choose photos from your gallery. Asset and barcode images are both optional."
+        className="mb-2"
+      />
+
+      <MobilePhotoPreviewGrid
+        assetUrl={session?.asset_image_url}
+        barcodeUrl={session?.barcode_image_url}
+      />
+
+      <div className="grid gap-3">
+        <Button
+          className="min-h-12 w-full text-base"
+          onClick={pickAsset}
+          disabled={uploading}
+        >
+          {uploading ? 'Uploading…' : 'Choose asset photo'}
         </Button>
         <input
           ref={assetRef}
@@ -39,13 +52,11 @@ export function MobileAssetCreateUploadPage() {
           className="hidden"
           onChange={(e) => uploadImage('assetimage', e.target.files?.[0])}
         />
-      </div>
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-        <p className="text-sm font-medium text-gray-900">Barcode image (optional)</p>
+
         <Button
           variant="outline"
-          className="mt-2 w-full"
-          onClick={() => barcodeRef.current?.click()}
+          className="min-h-12 w-full text-base"
+          onClick={pickBarcode}
           disabled={uploading}
         >
           Choose barcode photo
@@ -58,18 +69,16 @@ export function MobileAssetCreateUploadPage() {
           onChange={(e) => uploadImage('barcodeimage', e.target.files?.[0])}
         />
       </div>
-      {session?.asset_image_url && (
-        <img src={session.asset_image_url} alt="Asset" className="h-36 rounded-xl border object-cover" />
+
+      {error && (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+          {error}
+        </p>
       )}
-      {session?.barcode_image_url && (
-        <img src={session.barcode_image_url} alt="Barcode" className="h-24 rounded-xl border object-cover" />
-      )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {hasAsset && (
-        <Button onClick={() => navigate(donePath)} className="mt-auto">
-          {isPhotosFlow ? 'Done — sync to computer' : 'Back to form'}
-        </Button>
-      )}
+
+      <Button className="mt-auto min-h-12 w-full" onClick={() => navigate(routes.photos)}>
+        Done — back to photos
+      </Button>
     </MobileAssetPageLayout>
   );
 }

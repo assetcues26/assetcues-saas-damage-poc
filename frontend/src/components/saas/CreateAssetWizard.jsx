@@ -6,30 +6,36 @@ import {
   LOOKUP_FIELD_MAP,
   WIZARD_STEPS,
   validateWizardStep,
+  buildLookupChangePatch,
 } from './assetFormConfig';
 import { LookupSelect } from './LookupSelect';
 import { AssetDatePicker } from './AssetDatePicker';
+import { LookupIdHint } from './LookupIdHint';
 
 /**
  * @param {{
  *   values: Record<string, string>,
  *   onChange: (key: string, value: string) => void,
+ *   onPatch?: (patch: Record<string, string>) => void,
  *   step: number,
  *   onStepChange: (n: number) => void,
  *   photosSection?: React.ReactNode,
  *   reviewSection?: React.ReactNode,
  *   hideAssetId?: boolean,
+ *   readOnlyAutoAssign?: boolean,
  *   steps?: typeof WIZARD_STEPS,
  * }} props
  */
 export function CreateAssetWizard({
   values,
   onChange,
+  onPatch,
   step,
   onStepChange,
   photosSection,
   reviewSection,
-  hideAssetId = true,
+  hideAssetId = false,
+  readOnlyAutoAssign = true,
   steps = WIZARD_STEPS,
 }) {
   const [stepError, setStepError] = useState(null);
@@ -39,24 +45,12 @@ export function CreateAssetWizard({
     setStepError(null);
   }, [step]);
 
-  const handleLookup = (idKey, nameKey, id, label) => {
-    onChange(idKey, id);
-    onChange(nameKey, label);
-    if (idKey === 'assetclassid') {
-      onChange('categoryid', '');
-      onChange('categoryname', '');
-      onChange('subcategoryid', '');
-      onChange('subcategoryname', '');
-      onChange('makemodelid', '');
-      onChange('makemodelname', '');
-    } else if (idKey === 'categoryid') {
-      onChange('subcategoryid', '');
-      onChange('subcategoryname', '');
-      onChange('makemodelid', '');
-      onChange('makemodelname', '');
-    } else if (idKey === 'subcategoryid') {
-      onChange('makemodelid', '');
-      onChange('makemodelname', '');
+  const applyLookup = (idKey, nameKey, id, label) => {
+    const patch = buildLookupChangePatch(idKey, nameKey, id, label, values);
+    if (onPatch) {
+      onPatch(patch);
+    } else {
+      Object.entries(patch).forEach(([key, val]) => onChange(key, val));
     }
   };
 
@@ -81,7 +75,7 @@ export function CreateAssetWizard({
             parentId={parentId}
             value={values[lookup.idKey]}
             label={values[lookup.nameKey]}
-            onChange={(id, label) => handleLookup(lookup.idKey, lookup.nameKey, id, label)}
+            onChange={(id, label) => applyLookup(lookup.idKey, lookup.nameKey, id, label)}
             placeholder={`Select ${ASSET_FORM_FIELDS.find((f) => f.key === lookup.nameKey)?.label?.toLowerCase() || field.label.toLowerCase()}`}
             required={Boolean(ASSET_FORM_FIELDS.find((f) => f.key === lookup.nameKey)?.required)}
             disabled={lookup.parentKey && !parentId}
@@ -106,6 +100,30 @@ export function CreateAssetWizard({
       );
     }
 
+    if (field.autoAssign && readOnlyAutoAssign) {
+      return (
+        <div key={key} className="space-y-1">
+          <label className="text-xs font-medium text-gray-700">
+            {field.label}
+            {field.required && <span className="text-red-500"> *</span>}
+          </label>
+          <input
+            type="text"
+            readOnly
+            value={values[key] || ''}
+            placeholder={field.hint || 'Assigning…'}
+            className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+            aria-readonly="true"
+          />
+          {values[key] ? (
+            <LookupIdHint id={values[key]} label="Auto-assigned" />
+          ) : (
+            <p className="text-xs text-gray-500">{field.hint || 'Auto-assigned when form opens'}</p>
+          )}
+        </div>
+      );
+    }
+
     const isTextarea = field.type === 'textarea';
     const Tag = isTextarea ? 'textarea' : 'input';
     return (
@@ -122,9 +140,6 @@ export function CreateAssetWizard({
           onChange={(e) => onChange(key, e.target.value)}
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
         />
-        {field.hint && key === 'assetid' && (
-          <p className="text-xs text-gray-500">{field.hint}</p>
-        )}
       </div>
     );
   };

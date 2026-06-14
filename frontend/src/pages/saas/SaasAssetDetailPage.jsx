@@ -8,12 +8,13 @@ import {
   deleteSaasAssetImage,
   fetchSaasAsset,
   fetchSaasAssetAnalyses,
-  runSaasAssetAnalysis,
 } from '../../services/saasAssetsApi';
+import { enqueueAssetAnalysis } from '../../utils/analysisQueue';
 import { exportSaasAssetReportPdf } from '../../services/exportSaasAssetReportPdf';
 import { AnalysisDetailModal } from '../../components/saas/AnalysisDetailModal';
 import { AddAssetPhotosPanel } from '../../components/saas/AddAssetPhotosPanel';
 import { AnalysisReportView } from '../../components/saas/AnalysisReportView';
+import { AiDisabledBanner } from '../../components/saas/AiDisabledBanner';
 import { withAnalyzingState } from '../../utils/saasAssetState';
 import { useApp } from '../../context/AppContext';
 import { useSaasAssets } from '../../context/SaasAssetsContext';
@@ -61,7 +62,7 @@ export function SaasAssetDetailPage() {
       prev?.asset ? { ...prev, asset: withAnalyzingState(prev.asset) } : prev,
     );
     try {
-      await runSaasAssetAnalysis(id);
+      await enqueueAssetAnalysis(id);
       showToast('AI analysis started', 'success');
       await load({ silent: true });
     } catch (e) {
@@ -146,7 +147,7 @@ export function SaasAssetDetailPage() {
           </Button>
           <Button variant="outline" size="sm" disabled={rerunning} onClick={handleRerun}>
             <RefreshCw size={14} className="mr-1" />
-            {rerunning ? 'Starting…' : 'Re-run AI'}
+            {rerunning ? 'Starting…' : 'Run AI analysis'}
           </Button>
         </div>
       </div>
@@ -211,7 +212,9 @@ export function SaasAssetDetailPage() {
 
         <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold uppercase text-gray-500">Latest AI checks</h2>
-          {asset.ai_status === 'analyzing' ? (
+          {asset.ai_status === 'ai_disabled' && !detail.latest_analysis?.response_json ? (
+            <AiDisabledBanner />
+          ) : asset.ai_status === 'analyzing' ? (
             <p className="text-sm text-blue-600">AI validation in progress…</p>
           ) : (
             <div className="space-y-2 text-sm">
@@ -238,30 +241,34 @@ export function SaasAssetDetailPage() {
 
       <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold uppercase text-gray-500">Analysis history</h2>
-        <ul className="divide-y divide-gray-100">
-          {analyses.map((a) => (
-            <li key={a.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
-              <AiStatusBadge status={a.ai_status} />
-              <span className="text-gray-600">{new Date(a.created_at).toLocaleString()}</span>
-              <span className="text-gray-400">{a.request_id || '—'}</span>
-              <div className="ml-auto flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setAnalysisModal({ open: true, analysis: a })}
-                >
-                  View
-                </Button>
-                <Link
-                  to={`/assets/${id}/analysis/${a.id}`}
-                  className="text-sm font-medium text-blue-600 hover:text-blue-700"
-                >
-                  Deep dive
-                </Link>
-              </div>
-            </li>
-          ))}
-        </ul>
+        {analyses.length === 0 && asset.ai_status === 'ai_disabled' ? (
+          <AiDisabledBanner />
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {analyses.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
+                <AiStatusBadge status={a.ai_status} />
+                <span className="text-gray-600">{new Date(a.created_at).toLocaleString()}</span>
+                <span className="text-gray-400">{a.request_id || '—'}</span>
+                <div className="ml-auto flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setAnalysisModal({ open: true, analysis: a })}
+                  >
+                    View
+                  </Button>
+                  <Link
+                    to={`/assets/${id}/analysis/${a.id}`}
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    Deep dive
+                  </Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <AnalysisDetailModal

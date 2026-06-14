@@ -2,7 +2,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Camera, Upload, CheckCircle2 } from 'lucide-react';
 import { Card } from '../../../components/ui/Card';
 import { MobileAssetPageLayout } from '../../../components/saas/mobile/MobileAssetPageLayout';
-import { AssetCuesLogo } from '../../../components/saas/AssetCuesLogo';
+import { MobileBrandHeader } from '../../../components/saas/mobile/MobileBrandHeader';
 import { useAssetCreateSession } from '../../../hooks/useAssetCreateSession';
 
 export function MobileAssetCreatePhotosPage() {
@@ -37,14 +37,10 @@ export function MobileAssetCreatePhotosPage() {
 
   return (
     <MobileAssetPageLayout title="Add photos" wrapperClassName="flex flex-1 flex-col py-8">
-      <div className="text-center">
-        <AssetCuesLogo className="mx-auto" />
-        <h1 className="mt-4 text-2xl font-bold text-gray-900">Add asset photos</h1>
-        <p className="mx-auto mt-2 max-w-sm text-sm text-gray-600">
-          Capture or upload the asset image and optional barcode. Photos sync to your computer
-          automatically.
-        </p>
-      </div>
+      <MobileBrandHeader
+        title="Add asset photos"
+        subtitle="Capture or upload the asset image and optional barcode. Photos sync to your computer automatically."
+      />
 
       {(hasAsset || hasBarcode) && (
         <div className="mx-auto mt-6 grid w-full max-w-md gap-3">

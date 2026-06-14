@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchLookups } from '../../services/saasAssetsApi';
 import { getFallbackLookups } from '../../data/saasLookupsFallback';
+import { loadCustomLookups, saveCustomLookup } from '../../utils/customLookupsStorage';
 import {
-  buildCustomLookupId,
+  allocateCustomLookupId,
   CUSTOM_LOOKUP_VALUE,
-  isCustomLookupId,
 } from '../../utils/lookupCustom';
+import { LookupIdHint } from './LookupIdHint';
 
 function normalizeItem(item) {
   return {
@@ -26,6 +27,7 @@ function normalizeItem(item) {
  *   placeholder?: string,
  *   required?: boolean,
  *   disabled?: boolean,
+ *   showIdHint?: boolean,
  * }} props
  */
 export function LookupSelect({
@@ -38,12 +40,18 @@ export function LookupSelect({
   placeholder = 'Select…',
   required = false,
   disabled = false,
+  showIdHint = true,
 }) {
   const resolvedLabel = selectedLabel || label || '';
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCustom, setShowCustom] = useState(false);
   const [customText, setCustomText] = useState('');
+  const [storedCustoms, setStoredCustoms] = useState(() => loadCustomLookups(type));
+
+  useEffect(() => {
+    setStoredCustoms(loadCustomLookups(type));
+  }, [type]);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,12 +74,24 @@ export function LookupSelect({
   }, [type, parentId]);
 
   const displayItems = useMemo(() => {
-    const list = [...items];
-    if (value && isCustomLookupId(value) && !list.some((i) => i.id === value)) {
+    const seen = new Set();
+    const list = [];
+
+    const push = (item) => {
+      if (!item.id || seen.has(item.id)) return;
+      seen.add(item.id);
+      list.push(item);
+    };
+
+    items.forEach((item) => push(normalizeItem(item)));
+    storedCustoms.forEach((item) => push(normalizeItem(item)));
+
+    if (value && !seen.has(value)) {
       list.push({ id: value, label: resolvedLabel || 'Custom value' });
     }
+
     return list;
-  }, [items, value, resolvedLabel]);
+  }, [items, storedCustoms, value, resolvedLabel]);
 
   const handleChange = (e) => {
     const id = e.target.value;
@@ -91,10 +111,12 @@ export function LookupSelect({
   };
 
   const applyCustom = () => {
-    const label = customText.trim();
-    if (!label) return;
-    const id = buildCustomLookupId(label);
-    onChange(id, label);
+    const nextLabel = customText.trim();
+    if (!nextLabel) return;
+    const id = allocateCustomLookupId(type, displayItems, nextLabel);
+    saveCustomLookup(type, { id, label: nextLabel });
+    setStoredCustoms(loadCustomLookups(type));
+    onChange(id, nextLabel);
     setShowCustom(false);
     setCustomText('');
   };
@@ -124,6 +146,8 @@ export function LookupSelect({
           <option value={CUSTOM_LOOKUP_VALUE}>+ Create custom…</option>
         )}
       </select>
+
+      {showIdHint && value && !showCustom && <LookupIdHint id={value} />}
 
       {showCustom && (
         <div className="flex flex-col gap-2 rounded-lg border border-blue-200 bg-blue-50/60 p-3 sm:flex-row sm:items-center">

@@ -29,6 +29,8 @@ class SaasAssetSummary(BaseModel):
     cost: float | None = None
     acquisitiondate: str | None = None
     ai_status: str = "pending"
+    asset_image_path: str | None = None
+    barcode_image_path: str | None = None
     asset_image_url: str | None = None
     barcode_image_url: str | None = None
     created_at: str | None = None
@@ -111,6 +113,16 @@ class CreateAssetResponse(BaseModel):
     id: str
     assetid: str
     ai_status: str = "analyzing"
+
+
+class NextAssetIdentifiersResponse(BaseModel):
+    assetid: str
+    assetnumber: str
+
+
+class ClearAnalysesResponse(BaseModel):
+    analyses_deleted: int
+    assets_reset: int
 
 
 class UpdateAssetRequest(BaseModel):

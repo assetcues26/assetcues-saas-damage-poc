@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   completeAssetCreateSession,
   fetchAssetCreateSession,
+  saveAssetCreateSessionDraft,
   uploadAssetCreateSessionImage,
 } from '../services/saasAssetsApi';
+import { persistMobileCreateSuccess } from '../utils/mobileCreateSuccess';
+import { isAiAnalysisEnabled } from '../utils/saasAiSettings';
+import { enqueueAssetAnalysis } from '../utils/analysisQueue';
 
-const POLL_MS = 1000;
+const POLL_MS = 2000;
 
 /**
  * @param {string | undefined} token
@@ -20,6 +24,8 @@ export function useAssetCreateSession(token) {
   const [secondsRemaining, setSecondsRemaining] = useState(null);
 
   const expiresAt = session?.expires_at ?? null;
+  const pollStopped = session?.status === 'completed' || session?.status === 'expired';
+  const pollRef = useRef(null);
 
   const refresh = useCallback(async () => {
     if (!token) return;
@@ -37,10 +43,15 @@ export function useAssetCreateSession(token) {
   }, [token]);
 
   useEffect(() => {
+    if (!token) return undefined;
     refresh();
-    const id = setInterval(refresh, POLL_MS);
-    return () => clearInterval(id);
-  }, [refresh]);
+    if (pollStopped) return undefined;
+
+    pollRef.current = setInterval(refresh, POLL_MS);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [refresh, token, pollStopped]);
 
   useEffect(() => {
     if (!expiresAt) {
@@ -55,6 +66,17 @@ export function useAssetCreateSession(token) {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [expiresAt]);
+
+  const saveDraft = useCallback(
+    async (draftJson) => {
+      if (!token) return null;
+      const detail = await saveAssetCreateSessionDraft(token, draftJson);
+      setSession(detail);
+      setError(null);
+      return detail;
+    },
+    [token],
+  );
 
   const uploadImage = useCallback(
     async (fieldName, file) => {
@@ -80,11 +102,28 @@ export function useAssetCreateSession(token) {
   const complete = useCallback(
     async (metadata) => {
       if (!token) return null;
-      const result = await completeAssetCreateSession(token, metadata);
-      navigate(`/assets/create/mobile/${token}/done`);
+      const aiEnabled = isAiAnalysisEnabled();
+      const result = await completeAssetCreateSession(token, metadata, {
+        autoAnalyze: false,
+        skipAi: !aiEnabled,
+      });
+      if (aiEnabled && result.ai_status === 'pending') {
+        enqueueAssetAnalysis(result.asset_id).catch(() => {});
+      }
+      const success = {
+        aiStatus: result.ai_status,
+        assetId: result.asset_id,
+        assetTag: result.assetid,
+        assetName: session?.draft_json?.assetname || metadata?.assetname || '',
+      };
+      persistMobileCreateSuccess(token, success);
+      navigate(`/assets/create/mobile/${token}/done`, {
+        replace: true,
+        state: success,
+      });
       return result;
     },
-    [token, navigate],
+    [token, navigate, session?.draft_json?.assetname],
   );
 
   const canUse = useMemo(
@@ -101,6 +140,7 @@ export function useAssetCreateSession(token) {
     expiresAt,
     secondsRemaining,
     refresh,
+    saveDraft,
     uploadImage,
     complete,
   };

@@ -1,4 +1,4 @@
-import { ASSET_FORM_FIELDS } from '../assetFormConfig';
+import { ASSET_FORM_FIELDS, isRequiredFieldSatisfied } from '../assetFormConfig';
 
 const REQUIRED_KEYS = ASSET_FORM_FIELDS.filter((f) => f.required).map((f) => f.key);
 
@@ -6,7 +6,7 @@ const REQUIRED_KEYS = ASSET_FORM_FIELDS.filter((f) => f.required).map((f) => f.k
  * @param {{ values: Record<string, string> }} props
  */
 export function MobileFormProgress({ values }) {
-  const filled = REQUIRED_KEYS.filter((k) => String(values[k] || '').trim()).length;
+  const filled = REQUIRED_KEYS.filter((k) => isRequiredFieldSatisfied(values, k)).length;
   const total = REQUIRED_KEYS.length;
   const pct = total ? Math.round((filled / total) * 100) : 0;
 

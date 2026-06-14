@@ -33,3 +33,6 @@ Thumbs.db
 
 # Vercel local
 .vercel/
+
+# Supabase CLI local state
+supabase/.temp/

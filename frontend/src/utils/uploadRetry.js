@@ -12,6 +12,7 @@ export function isRetryableUploadError(err) {
     msg.includes('network error') ||
     msg.includes('timed out') ||
     msg.includes('failed to fetch') ||
+    msg.includes('cannot reach the api') ||
     msg.includes('load failed')
   );
 }

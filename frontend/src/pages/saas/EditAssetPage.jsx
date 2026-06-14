@@ -113,9 +113,11 @@ export function EditAssetPage() {
       <CreateAssetWizard
         values={values}
         onChange={(k, v) => setValues((prev) => ({ ...prev, [k]: v }))}
+        onPatch={(patch) => setValues((prev) => ({ ...prev, ...patch }))}
         step={step}
         onStepChange={setStep}
         hideAssetId={false}
+        readOnlyAutoAssign={false}
         steps={editSteps}
       />
 
