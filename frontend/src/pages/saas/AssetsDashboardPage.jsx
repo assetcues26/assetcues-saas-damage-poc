@@ -161,7 +161,7 @@ export function AssetsDashboardPage() {
     setBulkBusy(true);
     try {
       await bulkAnalyze();
-      showToast(`AI analysis finished for ${count} asset(s)`, 'success');
+      showToast(`AI analysis complete for ${count} asset(s)`, 'success');
     } finally {
       setBulkBusy(false);
     }

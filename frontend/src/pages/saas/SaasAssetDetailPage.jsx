@@ -9,7 +9,6 @@ import {
   fetchSaasAsset,
   fetchSaasAssetAnalyses,
 } from '../../services/saasAssetsApi';
-import { enqueueAssetAnalysis } from '../../utils/analysisQueue';
 import { exportSaasAssetReportPdf } from '../../services/exportSaasAssetReportPdf';
 import { AnalysisDetailModal } from '../../components/saas/AnalysisDetailModal';
 import { AddAssetPhotosPanel } from '../../components/saas/AddAssetPhotosPanel';
@@ -23,7 +22,7 @@ export function SaasAssetDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useApp();
-  const { refresh, refreshAll, markAssetAnalyzing } = useSaasAssets();
+  const { refresh, refreshAll, markAssetAnalyzing, runAnalysis } = useSaasAssets();
   const [detail, setDetail] = useState(null);
   const [analyses, setAnalyses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -58,15 +57,12 @@ export function SaasAssetDetailPage() {
 
   const handleRerun = async () => {
     setRerunning(true);
-    setDetail((prev) =>
-      prev?.asset ? { ...prev, asset: withAnalyzingState(prev.asset) } : prev,
-    );
     try {
-      await enqueueAssetAnalysis(id);
-      showToast('AI analysis started', 'success');
+      await runAnalysis(id);
+      showToast('AI analysis complete', 'success');
       await load({ silent: true });
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to start analysis', 'error');
+      showToast(e instanceof Error ? e.message : 'Failed to run analysis', 'error');
       await load({ silent: true });
     } finally {
       setRerunning(false);

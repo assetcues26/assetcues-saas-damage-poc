@@ -203,6 +203,8 @@ async def _background_analyze(
         restored = await repo.restore_ai_status_from_latest_analysis(asset_id)
         if not restored:
             await repo.set_ai_status(asset_id, "error")
+    finally:
+        await repo.ensure_analysis_not_stuck(asset_id)
 
 
 @router.get(
@@ -826,6 +828,7 @@ async def clear_all_analyses(
 )
 async def bulk_analyze_assets(
     body: BulkAssetIdsRequest,
+    background_tasks: BackgroundTasks,
     repo: SaasAssetsRepository = Depends(get_repo),
     settings: Settings = Depends(get_settings),
     rate_limiter: RateLimiter = Depends(get_saas_rate_limiter),
@@ -834,11 +837,10 @@ async def bulk_analyze_assets(
     _require_saas(repo)
     queued = await repo.bulk_analyze(settings.demo_user_id, body.asset_ids)
     for aid in queued:
-        try:
-            await repo.run_analysis(settings.demo_user_id, aid, None)
-        except Exception as exc:
-            logger.exception("saas_bulk_analyze_item_failed", asset_id=aid, error=str(exc))
-            await repo.restore_ai_status_from_latest_analysis(aid)
+        await repo.set_ai_status(aid, "analyzing")
+        background_tasks.add_task(
+            _background_analyze, settings, aid, settings.demo_user_id, None
+        )
     return BulkActionResponse(processed=len(queued), asset_ids=queued)
 
 
@@ -849,6 +851,7 @@ async def bulk_analyze_assets(
 )
 async def analyze_asset(
     asset_id: UUID,
+    background_tasks: BackgroundTasks,
     body: AnalyzeAssetRequest | None = Body(default=None),
     repo: SaasAssetsRepository = Depends(get_repo),
     settings: Settings = Depends(get_settings),
@@ -865,17 +868,11 @@ async def analyze_asset(
             detail="Upload asset photos before running AI analysis",
         )
     patch = body.metadata_patch if body else None
-    try:
-        final_status = await repo.run_analysis(
-            settings.demo_user_id,
-            str(asset_id),
-            patch,
-        )
-        return AnalyzeAssetResponse(asset_id=str(asset_id), ai_status=final_status)
-    except Exception as exc:
-        logger.exception("saas_analyze_failed", asset_id=str(asset_id), error=str(exc))
-        restored = await repo.restore_ai_status_from_latest_analysis(str(asset_id))
-        return AnalyzeAssetResponse(asset_id=str(asset_id), ai_status=restored or "error")
+    await repo.set_ai_status(str(asset_id), "analyzing")
+    background_tasks.add_task(
+        _background_analyze, settings, str(asset_id), settings.demo_user_id, patch
+    )
+    return AnalyzeAssetResponse(asset_id=str(asset_id), ai_status="analyzing")
 
 
 @router.get(

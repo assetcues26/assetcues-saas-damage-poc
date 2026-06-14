@@ -8,12 +8,10 @@ import {
   fetchSaasAssetsList,
 } from '../services/saasAssetsApi';
 import { isAssetAnalyzing, withAnalyzingState } from '../utils/saasAssetState';
-import { mergePreservingImageUrls, mergePollAssetStatuses } from '../utils/mergeAssetList';
+import { mergePreservingImageUrls } from '../utils/mergeAssetList';
 import {
   enqueueAssetAnalysis,
   enqueueAssetAnalysesSequential,
-  getAnalysisQueueLength,
-  getCurrentAnalysisAssetId,
   isAnalysisQueueBusy,
 } from '../utils/analysisQueue';
 
@@ -84,7 +82,11 @@ export function SaasAssetsProvider({ children }) {
   }, []);
 
   const refreshAssetAfterAnalysis = useCallback(
-    async (assetId, status) => {
+    async (assetId, status, assetSummary = null) => {
+      if (assetSummary) {
+        applyAssetSummary(assetSummary);
+        return;
+      }
       try {
         const detail = await fetchSaasAsset(assetId);
         if (detail?.asset) {
@@ -94,11 +96,13 @@ export function SaasAssetsProvider({ children }) {
       } catch {
         /* fall back to status only */
       }
-      setAssets((prev) =>
-        prev.map((asset) =>
-          asset.id === assetId ? { ...asset, ai_status: status } : asset,
-        ),
-      );
+      if (status && status !== 'analyzing' && status !== 'timeout') {
+        setAssets((prev) =>
+          prev.map((asset) =>
+            asset.id === assetId ? { ...asset, ai_status: status } : asset,
+          ),
+        );
+      }
     },
     [applyAssetSummary],
   );
@@ -106,10 +110,8 @@ export function SaasAssetsProvider({ children }) {
   const analysisHooks = useMemo(
     () => ({
       onStart: (id) => markAssetAnalyzing(id),
-      onDone: (id, status) => {
-        if (status && status !== 'analyzing' && status !== 'timeout') {
-          refreshAssetAfterAnalysis(id, status);
-        }
+      onDone: (id, status, assetSummary) => {
+        refreshAssetAfterAnalysis(id, status, assetSummary);
       },
     }),
     [markAssetAnalyzing, refreshAssetAfterAnalysis],
@@ -130,11 +132,7 @@ export function SaasAssetsProvider({ children }) {
       setAssets((prev) => {
         const items = body.items || [];
         if (silent && prev.length) {
-          return mergePollAssetStatuses(
-            mergePreservingImageUrls(prev, items),
-            prev,
-            getCurrentAnalysisAssetId(),
-          );
+          return mergePreservingImageUrls(prev, items);
         }
         return items;
       });

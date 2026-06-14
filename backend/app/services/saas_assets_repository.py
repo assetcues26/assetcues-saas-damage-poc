@@ -249,9 +249,12 @@ class SaasAssetsRepository:
     async def restore_ai_status_from_latest_analysis(self, asset_id: str) -> str | None:
         return await asyncio.to_thread(self._restore_ai_status_from_latest_sync, asset_id)
 
+    async def ensure_analysis_not_stuck(self, asset_id: str) -> None:
+        await asyncio.to_thread(self._ensure_analysis_not_stuck_sync, asset_id)
+
     def _recover_stale_asset_row_sync(self, row: dict) -> dict:
         status = row.get("ai_status") or "pending"
-        if status not in ("analyzing", "error"):
+        if status != "analyzing":
             return row
         latest = self._latest_analysis_for_asset(row["id"])
         if not latest:
@@ -259,9 +262,6 @@ class SaasAssetsRepository:
         prev = latest.get("ai_status")
         if prev not in ("pass", "fail"):
             return row
-        if status == "error":
-            restored = self._restore_ai_status_from_latest_sync(row["id"])
-            return {**row, "ai_status": restored} if restored else row
         updated = self._parse_ts(row.get("updated_at"))
         if not updated:
             return row
@@ -270,6 +270,35 @@ class SaasAssetsRepository:
             return row
         restored = self._restore_ai_status_from_latest_sync(row["id"])
         return {**row, "ai_status": restored} if restored else row
+
+    def _ensure_analysis_not_stuck_sync(self, asset_id: str) -> None:
+        result = (
+            self._table("registered_assets")
+            .select("ai_status")
+            .eq("id", asset_id)
+            .limit(1)
+            .execute()
+        )
+        rows = result.data or []
+        if not rows or rows[0].get("ai_status") != "analyzing":
+            return
+        restored = self._restore_ai_status_from_latest_sync(asset_id)
+        if not restored:
+            self._table("registered_assets").update({"ai_status": "error"}).eq("id", asset_id).execute()
+
+    def _record_analysis_error_sync(self, asset_id: str, user_id: int, message: str) -> None:
+        self._table("registered_assets").update({"ai_status": "error"}).eq("id", asset_id).execute()
+        self._table("asset_analyses").insert(
+            {
+                "asset_id": asset_id,
+                "user_id": user_id,
+                "request_id": None,
+                "response_json": {"error": message},
+                "ai_status": "error",
+                "failure_summary": {"error": message},
+                "response_time_seconds": None,
+            }
+        ).execute()
 
     def _summary_from_row(self, row: dict, *, latest: dict | None = None) -> SaasAssetSummary:
         if latest is None:
@@ -734,42 +763,31 @@ class SaasAssetsRepository:
 
         self._table("registered_assets").update({"ai_status": "analyzing"}).eq("id", asset_id).execute()
 
-        metadata = self._row_to_metadata(row)
-        asset_bytes = asset_image
-        barcode_bytes = barcode_image
-        resolved_asset_mime = asset_mime
-        resolved_barcode_mime = barcode_mime
-
-        if asset_bytes is None and row.get("asset_image_path"):
-            try:
-                asset_bytes = self._download_image_bytes(row["asset_image_path"])
-                resolved_asset_mime = sniff_image_mime(asset_bytes) or asset_mime
-            except Exception as exc:
-                logger.warning("saas_download_asset_image_failed", error=str(exc))
-        if barcode_bytes is None and row.get("barcode_image_path"):
-            try:
-                barcode_bytes = self._download_image_bytes(row["barcode_image_path"])
-                resolved_barcode_mime = sniff_image_mime(barcode_bytes) or barcode_mime
-            except Exception as exc:
-                logger.warning("saas_download_barcode_image_failed", error=str(exc))
-
-        if not asset_bytes and not barcode_bytes:
-            message = "Asset image is required for AI analysis"
-            self._table("registered_assets").update({"ai_status": "error"}).eq("id", asset_id).execute()
-            self._table("asset_analyses").insert(
-                {
-                    "asset_id": asset_id,
-                    "user_id": user_id,
-                    "request_id": None,
-                    "response_json": {"error": message},
-                    "ai_status": "error",
-                    "failure_summary": {"error": message},
-                    "response_time_seconds": None,
-                }
-            ).execute()
-            return "error"
-
         try:
+            metadata = self._row_to_metadata(row)
+            asset_bytes = asset_image
+            barcode_bytes = barcode_image
+            resolved_asset_mime = asset_mime
+            resolved_barcode_mime = barcode_mime
+
+            if asset_bytes is None and row.get("asset_image_path"):
+                try:
+                    asset_bytes = self._download_image_bytes(row["asset_image_path"])
+                    resolved_asset_mime = sniff_image_mime(asset_bytes) or asset_mime
+                except Exception as exc:
+                    logger.warning("saas_download_asset_image_failed", error=str(exc))
+            if barcode_bytes is None and row.get("barcode_image_path"):
+                try:
+                    barcode_bytes = self._download_image_bytes(row["barcode_image_path"])
+                    resolved_barcode_mime = sniff_image_mime(barcode_bytes) or barcode_mime
+                except Exception as exc:
+                    logger.warning("saas_download_barcode_image_failed", error=str(exc))
+
+            if not asset_bytes and not barcode_bytes:
+                message = "Asset image is required for AI analysis"
+                self._record_analysis_error_sync(asset_id, user_id, message)
+                return "error"
+
             response, request_id, elapsed = asyncio.run(
                 analyze_asset_with_tagging_ai(
                     self.settings,
@@ -780,52 +798,41 @@ class SaasAssetsRepository:
                     barcode_mime=resolved_barcode_mime,
                 )
             )
-        except Exception as exc:
-            logger.exception("saas_tagging_ai_failed", asset_id=asset_id, error=str(exc))
-            restored = self._restore_ai_status_from_latest_sync(asset_id)
-            if not restored:
-                self._table("registered_assets").update({"ai_status": "error"}).eq("id", asset_id).execute()
-                self._table("asset_analyses").insert(
-                    {
-                        "asset_id": asset_id,
-                        "user_id": user_id,
-                        "request_id": None,
-                        "response_json": {"error": str(exc)},
-                        "ai_status": "error",
-                        "failure_summary": {"error": str(exc)},
-                        "response_time_seconds": None,
-                    }
-                ).execute()
-            return restored or "error"
 
-        apply_image_readability(
-            response,
-            has_asset_image=bool(asset_bytes),
-            has_barcode_image=bool(barcode_bytes),
-        )
-        ai_status, failure_summary = compute_ai_status(response, metadata)
-        self._table("asset_analyses").insert(
-            {
-                "asset_id": asset_id,
-                "user_id": user_id,
-                "request_id": request_id,
-                "response_json": response,
-                "ai_status": ai_status,
-                "failure_summary": failure_summary,
-                "response_time_seconds": round(elapsed, 2),
-            }
-        ).execute()
-        self._table("registered_assets").update({"ai_status": ai_status}).eq("id", asset_id).execute()
-        self._log_activity_sync(
-            user_id,
-            "analysis_complete",
-            f"AI {ai_status} for {row.get('assetname') or row.get('assetid')}",
-            asset_id=asset_id,
-            assetname=row.get("assetname"),
-            assetid=row.get("assetid"),
-            ai_status=ai_status,
-        )
-        return ai_status
+            apply_image_readability(
+                response,
+                has_asset_image=bool(asset_bytes),
+                has_barcode_image=bool(barcode_bytes),
+            )
+            ai_status, failure_summary = compute_ai_status(response, metadata)
+            self._table("asset_analyses").insert(
+                {
+                    "asset_id": asset_id,
+                    "user_id": user_id,
+                    "request_id": request_id,
+                    "response_json": response,
+                    "ai_status": ai_status,
+                    "failure_summary": failure_summary,
+                    "response_time_seconds": round(elapsed, 2),
+                }
+            ).execute()
+            self._table("registered_assets").update({"ai_status": ai_status}).eq("id", asset_id).execute()
+            self._log_activity_sync(
+                user_id,
+                "analysis_complete",
+                f"AI {ai_status} for {row.get('assetname') or row.get('assetid')}",
+                asset_id=asset_id,
+                assetname=row.get("assetname"),
+                assetid=row.get("assetid"),
+                ai_status=ai_status,
+            )
+            return ai_status
+        except Exception as exc:
+            logger.exception("saas_run_analysis_failed", asset_id=asset_id, error=str(exc))
+            self._record_analysis_error_sync(asset_id, user_id, str(exc))
+            return "error"
+        finally:
+            self._ensure_analysis_not_stuck_sync(asset_id)
 
     async def list_analyses(self, user_id: int, asset_id: str) -> list[SaasAnalysisItem]:
         return await asyncio.to_thread(self._list_analyses_sync, user_id, asset_id)
