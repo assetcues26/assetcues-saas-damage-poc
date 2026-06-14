@@ -62,7 +62,7 @@ DEMO_ASSETS = [
         "subcategoryname": "MacBook",
         "makemodelid": "mm-mac-pro",
         "makemodelname": 'Apple MacBook Pro 14"',
-        "tagnumber": "TAG-MAC-003",
+        "tagnumber": "10000052",
         "assetnumber": "FAR-MAC-003",
         "companyid": "1000",
         "company": "AssetCues Demo Corp",
