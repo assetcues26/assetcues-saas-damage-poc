@@ -7,6 +7,7 @@ import { PageWrapper } from '../../components/layout/PageWrapper';
 import { ProceedButton } from '../../components/ui/ProceedButton';
 import { SaasFlowPageLayout } from '../../components/saas/SaasFlowPageLayout';
 import { useApp } from '../../context/AppContext';
+import { useSaasAssets } from '../../context/SaasAssetsContext';
 import { createSaasAsset, saveWebDraft } from '../../services/saasAssetsApi';
 import { AssetCreateQrPanel } from '../../components/saas/AssetCreateQrPanel';
 import { AssetPhotoUploadPanel } from '../../components/saas/AssetPhotoUploadPanel';
@@ -30,6 +31,7 @@ const DRAFT_DEBOUNCE_MS = 3000;
 export function CreateAssetPage() {
   const navigate = useNavigate();
   const { showToast } = useApp();
+  const { refreshAll } = useSaasAssets();
   const [createMode, setCreateMode] = useState(null);
   const [values, setValues] = useState(() => applyAssetFormPrefs({ ...EMPTY_ASSET_FORM }));
   const [wizardStep, setWizardStep] = useState(0);
@@ -144,19 +146,16 @@ export function CreateAssetPage() {
       setSessionAssetUrl(session.asset_image_url);
       setAssetPreview(null);
       setAssetFile(null);
-      if (session.newAsset) {
-        showToast('Asset photo synced from phone', 'success');
-      }
     }
     if (session.barcode_image_url) {
       setSessionBarcodeUrl(session.barcode_image_url);
       setBarcodePreview(null);
       setBarcodeFile(null);
-      if (session.newBarcode) {
-        showToast('Barcode photo synced from phone', 'success');
-      }
     }
-  }, [showToast]);
+    if (session.newAsset || session.newBarcode) {
+      refreshAll({ silent: true });
+    }
+  }, [refreshAll]);
 
   const onSessionCompleted = useCallback(() => {
     showToast('Asset created on mobile — AI analysis started', 'success');

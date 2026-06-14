@@ -4,10 +4,13 @@ import { CheckCircle2, Copy, QrCode, RefreshCw, Smartphone } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { createAssetCreateSession, fetchAssetCreateSession } from '../../services/saasAssetsApi';
 import { buildAssetCreateScanUrl } from '../../utils/assetCreateScanUrl';
+import { detectNewSessionImages } from '../../utils/sessionImageSync';
 import { useApp } from '../../context/AppContext';
 import { QrCodePlaceholder } from '../session/QrCodePlaceholder';
 import { SESSION_MODE_FULL_MOBILE, SESSION_MODE_IMAGES_ONLY } from './assetFormConfig';
 import { SessionExpiryCountdown } from './SessionExpiryCountdown';
+
+const SESSION_POLL_MS = 1000;
 
 function notifyDesktop(title, body) {
   if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
@@ -48,10 +51,11 @@ export function AssetCreateQrPanel({
   const [qrDataUrl, setQrDataUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [synced, setSynced] = useState(false);
+  const [syncStatusLabel, setSyncStatusLabel] = useState(null);
   const [startAttempted, setStartAttempted] = useState(false);
   const [pulse, setPulse] = useState(false);
-  const lastAssetUrlRef = useRef(null);
-  const lastBarcodeUrlRef = useRef(null);
+  const seenImagesRef = useRef({ asset: null, barcode: null });
+  const completedHandledRef = useRef(false);
 
   const sessionMode = mode === 'images_only' ? SESSION_MODE_IMAGES_ONLY : SESSION_MODE_FULL_MOBILE;
   const scanUrl = token ? buildAssetCreateScanUrl(token, sessionMode) : null;
@@ -67,8 +71,9 @@ export function AssetCreateQrPanel({
       setToken(body.session_token);
       setExpiresAt(body.expires_at);
       setSynced(false);
-      lastAssetUrlRef.current = null;
-      lastBarcodeUrlRef.current = null;
+      setSyncStatusLabel(null);
+      seenImagesRef.current = { asset: null, barcode: null };
+      completedHandledRef.current = false;
       onSessionStarted?.(body.session_token);
       showToast('Scan the QR code with your phone', 'success');
       if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
@@ -107,33 +112,49 @@ export function AssetCreateQrPanel({
         const session = await fetchAssetCreateSession(token);
         if (session.expires_at) setExpiresAt(session.expires_at);
 
-        const newAsset =
-          session.asset_image_url &&
-          session.asset_image_url !== lastAssetUrlRef.current;
-        const newBarcode =
-          session.barcode_image_url &&
-          session.barcode_image_url !== lastBarcodeUrlRef.current;
+        const { newAsset, newBarcode, assetKey, barcodeKey } = detectNewSessionImages(
+          session,
+          seenImagesRef.current,
+        );
 
         if (newAsset || newBarcode) {
-          if (newAsset) lastAssetUrlRef.current = session.asset_image_url;
-          if (newBarcode) lastBarcodeUrlRef.current = session.barcode_image_url;
+          if (assetKey) seenImagesRef.current.asset = assetKey;
+          if (barcodeKey) seenImagesRef.current.barcode = barcodeKey;
           onSessionImages?.({
             ...session,
             session_token: token,
-            newAsset: Boolean(newAsset),
-            newBarcode: Boolean(newBarcode),
+            newAsset,
+            newBarcode,
           });
           setSynced(true);
           setPulse(true);
           window.setTimeout(() => setPulse(false), 1200);
+          const hasAsset = Boolean(seenImagesRef.current.asset);
+          const hasBarcode = Boolean(seenImagesRef.current.barcode);
+          if (hasAsset && hasBarcode) {
+            setSyncStatusLabel('Asset and barcode images received from mobile session');
+          } else if (hasAsset) {
+            setSyncStatusLabel('Asset image received from mobile session');
+          } else if (hasBarcode) {
+            setSyncStatusLabel('Barcode image received from mobile session');
+          }
           if (newAsset) {
-            notifyDesktop('Asset photo synced', 'Asset image arrived from your phone');
+            showToast('Asset image received from mobile session', 'success');
+            notifyDesktop(
+              'Asset image received',
+              'The asset photo from your mobile session is ready on desktop.',
+            );
           }
           if (newBarcode) {
-            notifyDesktop('Barcode photo synced', 'Barcode image arrived from your phone');
+            showToast('Barcode image received from mobile session', 'success');
+            notifyDesktop(
+              'Barcode image received',
+              'The barcode photo from your mobile session is ready on desktop.',
+            );
           }
         }
-        if (session.status === 'completed') {
+        if (session.status === 'completed' && !completedHandledRef.current) {
+          completedHandledRef.current = true;
           notifyDesktop('Asset created', 'Mobile session completed');
           onSessionCompleted?.(session);
         }
@@ -142,9 +163,9 @@ export function AssetCreateQrPanel({
       }
     };
     poll();
-    const id = setInterval(poll, 3000);
+    const id = setInterval(poll, SESSION_POLL_MS);
     return () => clearInterval(id);
-  }, [token, onSessionImages, onSessionCompleted]);
+  }, [token, onSessionImages, onSessionCompleted, showToast]);
 
   const copyUrl = async () => {
     if (!scanUrl) return;
@@ -180,10 +201,10 @@ export function AssetCreateQrPanel({
           <p className="mt-2 text-xs text-gray-500">Asset image required · barcode optional</p>
           <SessionExpiryCountdown expiresAt={expiresAt} />
 
-          {mode === 'images_only' && synced && (
+          {mode === 'images_only' && synced && syncStatusLabel && (
             <div className="mt-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
               <CheckCircle2 size={16} className="shrink-0" />
-              Photos synced from phone
+              {syncStatusLabel}
             </div>
           )}
 

@@ -51,7 +51,7 @@ export function SaasAssetDetailPage() {
 
   useEffect(() => {
     if (detail?.asset?.ai_status !== 'analyzing') return undefined;
-    const timer = setInterval(() => load({ silent: true }), 3500);
+    const timer = setInterval(() => load({ silent: true }), 1500);
     return () => clearInterval(timer);
   }, [detail?.asset?.ai_status, load]);
 

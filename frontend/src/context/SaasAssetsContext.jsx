@@ -12,12 +12,12 @@ import { isAssetAnalyzing, withAnalyzingState } from '../utils/saasAssetState';
 
 const SaasAssetsContext = createContext(null);
 
-const POLL_MS = 8000;
-const POLL_MS_ANALYZING = 3500;
-const STATS_POLL_MS = 15000;
-const STATS_POLL_MS_ANALYZING = 8000;
-const ACTIVITY_POLL_MS = 30000;
-const ACTIVITY_POLL_MS_ANALYZING = 15000;
+const POLL_MS = 3000;
+const POLL_MS_ANALYZING = 1500;
+const STATS_POLL_MS = 10000;
+const STATS_POLL_MS_ANALYZING = 5000;
+const ACTIVITY_POLL_MS = 20000;
+const ACTIVITY_POLL_MS_ANALYZING = 10000;
 const PAGE_SIZE = 25;
 
 function computeStatsFromAssets(items, total) {

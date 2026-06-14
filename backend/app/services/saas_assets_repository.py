@@ -28,6 +28,7 @@ from app.services.tagging_ai_client import (
     compute_ai_status,
     extract_summary_fields,
 )
+from app.utils.saas_image_compress import compress_image_bytes_for_tagging_ai
 from app.utils.uploads import sniff_image_mime
 
 logger = structlog.get_logger()
@@ -166,8 +167,9 @@ class SaasAssetsRepository:
             return None
 
     def _upload_bytes(self, path: str, data: bytes, mime_type: str = "image/jpeg") -> None:
+        prepared = compress_image_bytes_for_tagging_ai(data)
         storage = self._get_client().storage.from_(self._bucket())
-        storage.upload(path, data, {"content-type": mime_type, "upsert": "true"})
+        storage.upload(path, prepared, {"content-type": "image/jpeg", "upsert": "true"})
 
     def _download_bytes(self, path: str) -> bytes:
         return self._get_client().storage.from_(self._bucket()).download(path)
@@ -330,6 +332,8 @@ class SaasAssetsRepository:
             session_token=row["session_token"],
             status=row.get("status") or "active",
             draft_json=row.get("draft_json") or {},
+            asset_image_path=row.get("asset_image_path"),
+            barcode_image_path=row.get("barcode_image_path"),
             asset_image_url=self._signed_url(row.get("asset_image_path")),
             barcode_image_url=self._signed_url(row.get("barcode_image_path")),
             expires_at=self._iso(row.get("expires_at")),

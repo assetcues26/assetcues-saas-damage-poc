@@ -6,7 +6,7 @@ import {
   uploadAssetCreateSessionImage,
 } from '../services/saasAssetsApi';
 
-const POLL_MS = 2500;
+const POLL_MS = 1000;
 
 /**
  * @param {string | undefined} token

@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { DEFAULT_MARKET_REGION } from '../constants/markets';
@@ -29,6 +30,7 @@ export function AppProvider({ children }) {
     version: '1.0.0',
   });
   const [toasts, setToasts] = useState([]);
+  const recentToastRef = useRef(new Map());
   const [previewImage, setPreviewImage] = useState(null);
   const [lastResult, setLastResult] = useState(null);
   const [analysisError, setAnalysisError] = useState(null);
@@ -63,6 +65,12 @@ export function AppProvider({ children }) {
   }, []);
 
   const showToast = useCallback((message, variant = 'info') => {
+    const key = `${variant}:${message}`;
+    const now = Date.now();
+    const lastAt = recentToastRef.current.get(key) || 0;
+    if (now - lastAt < 4000) return null;
+    recentToastRef.current.set(key, now);
+
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     setToasts((prev) => [...prev, { id, message, variant }]);
     return id;
