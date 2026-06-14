@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '../../components/ui/Spinner';
 import { CreateAssetWizard } from '../../components/saas/CreateAssetWizard';
+import { AddAssetPhotosPanel } from '../../components/saas/AddAssetPhotosPanel';
 import {
   EMPTY_ASSET_FORM,
   WIZARD_STEPS,
@@ -20,6 +21,7 @@ export function EditAssetPage() {
   const { showToast } = useApp();
   const { refresh, markAssetAnalyzing } = useSaasAssets();
   const [values, setValues] = useState({ ...EMPTY_ASSET_FORM });
+  const [hasAssetImage, setHasAssetImage] = useState(true);
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -35,6 +37,7 @@ export function EditAssetPage() {
             Object.keys(prev).map((k) => [k, a[k] != null ? String(a[k]) : '']),
           ),
         }));
+        setHasAssetImage(Boolean(a.asset_image_url));
       })
       .catch((e) => {
         setError(e instanceof Error ? e.message : 'Failed to load asset');
@@ -84,6 +87,28 @@ export function EditAssetPage() {
         Back to asset
       </Button>
       <h1 className="mb-6 text-2xl font-bold text-gray-900">Edit asset</h1>
+
+      {!hasAssetImage && (
+        <div className="mb-6">
+          <AddAssetPhotosPanel
+            assetId={id}
+            assetName={values.assetname || values.assetid}
+            onAnalyzing={() => markAssetAnalyzing(id)}
+            onComplete={async () => {
+              setHasAssetImage(true);
+              await refresh({ silent: true });
+              const d = await fetchSaasAsset(id);
+              const a = d.asset || {};
+              setValues((prev) => ({
+                ...prev,
+                ...Object.fromEntries(
+                  Object.keys(prev).map((k) => [k, a[k] != null ? String(a[k]) : '']),
+                ),
+              }));
+            }}
+          />
+        </div>
+      )}
 
       <CreateAssetWizard
         values={values}

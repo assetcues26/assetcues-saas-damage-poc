@@ -3,29 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '../../components/ui/Spinner';
-import { AssetResultCard } from '../../components/result/AssetResultCard';
+import { AnalysisReportView } from '../../components/saas/AnalysisReportView';
 import { fetchSaasAsset, fetchSaasAssetAnalysis } from '../../services/saasAssetsApi';
-
-function mapAnalysisToResult(analysis, asset) {
-  const r = analysis?.response_json || {};
-  return {
-    id: analysis?.id,
-    assetName: asset?.assetname || r.detectedAsset,
-    detectedAsset: r.detectedAsset,
-    condition: r.condition,
-    imageAnalysis: r.imageAnalysis,
-    namedescriptionmatch: r.namedescriptionmatch,
-    subcatmodelmatch: r.subcatmodelmatch,
-    detectedtagnumbermatch: r.detectedtagnumbermatch,
-    costvalidation: r.costvalidation,
-    acquisitiondatevalidation: r.acquisitiondatevalidation,
-    reasoning: r.reasoning,
-    damage_assessment: r.damage_assessment,
-    assetImageUrl: asset?.asset_image_url,
-    barcodeImageUrl: asset?.barcode_image_url,
-    ...r,
-  };
-}
 
 export function AnalysisDeepDivePage() {
   const { id, aid } = useParams();
@@ -55,8 +34,6 @@ export function AnalysisDeepDivePage() {
     return <p className="p-6 text-gray-600">Analysis not found.</p>;
   }
 
-  const result = mapAnalysisToResult(analysis, asset);
-
   return (
     <div className="p-6">
       <div className="mb-6 flex items-center gap-3">
@@ -64,12 +41,46 @@ export function AnalysisDeepDivePage() {
           <ArrowLeft size={16} className="mr-1" />
           Asset detail
         </Button>
-        <h1 className="text-xl font-bold text-gray-900">Analysis deep dive</h1>
+        <h1 className="text-xl font-bold text-gray-900">AI validation deep dive</h1>
         <Link to={`/assets/${id}`} className="ml-auto text-sm text-blue-600">
-          Back to register
+          Back to asset
         </Link>
       </div>
-      <AssetResultCard result={result} />
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <AnalysisReportView
+          analysis={analysis}
+          asset={asset}
+          aiStatus={analysis.ai_status}
+          analyzedAt={analysis.created_at}
+        />
+
+        {(asset?.asset_image_url || asset?.barcode_image_url) && (
+          <aside className="space-y-4">
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Evidence images
+              </h2>
+              <div className="space-y-3">
+                {asset.asset_image_url && (
+                  <img
+                    src={asset.asset_image_url}
+                    alt="Asset"
+                    className="w-full rounded-lg border object-cover"
+                  />
+                )}
+                {asset.barcode_image_url && (
+                  <img
+                    src={asset.barcode_image_url}
+                    alt="Barcode"
+                    className="w-full rounded-lg border object-cover"
+                  />
+                )}
+              </div>
+            </div>
+          </aside>
+        )}
+      </div>
     </div>
   );
 }

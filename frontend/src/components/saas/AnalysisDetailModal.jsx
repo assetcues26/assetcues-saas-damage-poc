@@ -2,16 +2,16 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Modal } from '../ui/Modal';
 import { MatchBadge } from './AiStatusBadge';
+import { AnalysisReportView } from './AnalysisReportView';
 
 /**
- * @param {{ open: boolean, onClose: () => void, analysis: object | null, assetId?: string, analyses?: object[] }} props
+ * @param {{ open: boolean, onClose: () => void, analysis: object | null, asset?: object | null, assetId?: string, analyses?: object[] }} props
  */
-export function AnalysisDetailModal({ open, onClose, analysis, assetId, analyses = [] }) {
+export function AnalysisDetailModal({ open, onClose, analysis, asset, assetId, analyses = [] }) {
   const [tab, setTab] = useState('detail');
   const [compareA, setCompareA] = useState('');
   const [compareB, setCompareB] = useState('');
 
-  const data = analysis?.response_json || analysis || {};
   const canCompare = analyses.length >= 2;
 
   const diff = useMemo(() => {
@@ -33,7 +33,7 @@ export function AnalysisDetailModal({ open, onClose, analysis, assetId, analyses
   if (!analysis) return null;
 
   return (
-    <Modal open={open} onClose={onClose} title="Full AI Analysis" size="xl">
+    <Modal open={open} onClose={onClose} title="AI Validation Report" size="xl">
       <div className="mb-4 flex gap-2 border-b border-gray-100 pb-2">
         <TabButton active={tab === 'detail'} onClick={() => setTab('detail')}>
           Details
@@ -97,55 +97,13 @@ export function AnalysisDetailModal({ open, onClose, analysis, assetId, analyses
           )}
         </div>
       ) : (
-        <div className="max-h-[70vh] space-y-5 overflow-y-auto text-sm">
-          <Section title="Asset detected">
-            <Row label="Detected asset" value={data.detectedAsset} />
-            <Row label="Condition" value={data.condition} />
-            <p className="text-gray-600">{data.imageAnalysis}</p>
-            <Row label="Image readability" value={data.imageReadability} />
-          </Section>
-
-          <Section title="Name & description">
-            <Row label="Match" value={<MatchBadge value={data.namedescriptionmatch} />} />
-            <Row label="Confidence" value={`${data.namedescriptionmatchpercent ?? '—'}%`} />
-            <p className="text-gray-600">{data.reasoning}</p>
-          </Section>
-
-          <Section title="Classification">
-            <Row label="Match" value={<MatchBadge value={data.subcatmodelmatch} />} />
-            <Row label="Confidence" value={`${data.subcatmodelmatchpercent ?? '—'}%`} />
-            {data.recommendedsubcategory && (
-              <Row label="Recommended subcategory" value={data.recommendedsubcategory} />
-            )}
-            {data.recommendedmakemodel && (
-              <Row label="Recommended make/model" value={data.recommendedmakemodel} />
-            )}
-          </Section>
-
-          <Section title="Tag / barcode">
-            <Row label="User tag" value={data.tagnumber} />
-            <Row label="Detected tag" value={data.detectedtagnumber} />
-            <Row label="Match" value={<MatchBadge value={data.detectedtagnumbermatch} />} />
-          </Section>
-
-          <Section title="Cost validation">
-            <Row label="Match" value={<MatchBadge value={data.costvalidation?.costmatch} />} />
-            <Row label="User cost" value={data.costvalidation?.usercost} />
-            <Row label="Estimated cost" value={data.costvalidation?.estimatedcost} />
-            <p className="text-gray-600">{data.costvalidation?.reasoning}</p>
-          </Section>
-
-          <Section title="Acquisition date">
-            <Row label="Match" value={<MatchBadge value={data.acquisitiondatevalidation?.datematch} />} />
-            <Row label="User date" value={data.acquisitiondatevalidation?.useracquisitiondate} />
-            <p className="text-gray-600">{data.acquisitiondatevalidation?.reasoning}</p>
-          </Section>
-
-          {data.damage_assessment && (
-            <Section title="Damage assessment">
-              <p className="text-gray-600">{data.damage_assessment}</p>
-            </Section>
-          )}
+        <div className="max-h-[75vh] overflow-y-auto pr-1">
+          <AnalysisReportView
+            analysis={analysis}
+            asset={asset}
+            aiStatus={analysis.ai_status}
+            analyzedAt={analysis.created_at}
+          />
         </div>
       )}
     </Modal>
@@ -163,24 +121,5 @@ function TabButton({ active, onClick, children }) {
     >
       {children}
     </button>
-  );
-}
-
-function Section({ title, children }) {
-  return (
-    <div>
-      <h3 className="mb-2 font-semibold text-gray-900">{title}</h3>
-      <div className="space-y-1">{children}</div>
-    </div>
-  );
-}
-
-function Row({ label, value }) {
-  if (value === undefined || value === null || value === '') return null;
-  return (
-    <p className="text-gray-700">
-      <span className="font-medium">{label}:</span>{' '}
-      <span className="text-gray-600">{value}</span>
-    </p>
   );
 }

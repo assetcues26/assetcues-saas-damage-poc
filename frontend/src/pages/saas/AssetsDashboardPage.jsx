@@ -7,6 +7,7 @@ import {
   Search,
   Trash2,
   Eye,
+  ImagePlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '../../components/ui/Spinner';
@@ -74,6 +75,7 @@ export function AssetsDashboardPage() {
   const [analysisModal, setAnalysisModal] = useState({
     open: false,
     analysis: null,
+    asset: null,
     assetId: null,
     analyses: [],
   });
@@ -95,16 +97,25 @@ export function AssetsDashboardPage() {
   };
 
   const openFailure = async (asset) => {
-    if (asset.failure_summary) {
-      setFailureModal({ open: true, asset, summary: asset.failure_summary });
+    if (!asset.latest_analysis_id) {
+      if (asset.failure_summary) {
+        setFailureModal({ open: true, asset, summary: asset.failure_summary });
+      }
       return;
     }
-    if (!asset.latest_analysis_id) return;
     try {
       const analysis = await fetchSaasAssetAnalysis(asset.id, asset.latest_analysis_id);
-      setFailureModal({ open: true, asset, summary: analysis.failure_summary });
+      setAnalysisModal({
+        open: true,
+        analysis,
+        asset,
+        assetId: asset.id,
+        analyses: [],
+      });
     } catch {
-      setFailureModal({ open: true, asset, summary: { checks: {} } });
+      if (asset.failure_summary) {
+        setFailureModal({ open: true, asset, summary: asset.failure_summary });
+      }
     }
   };
 
@@ -117,6 +128,7 @@ export function AssetsDashboardPage() {
       setAnalysisModal({
         open: true,
         analysis,
+        asset,
         assetId: asset.id,
         analyses: list.items || [],
       });
@@ -359,6 +371,13 @@ export function AssetsDashboardPage() {
                           label="Edit"
                           onClick={() => navigate(`/assets/${asset.id}/edit`)}
                         />
+                        {!asset.asset_image_url && (
+                          <RowAction
+                            icon={ImagePlus}
+                            label="Add photos"
+                            onClick={() => navigate(`/assets/${asset.id}`)}
+                          />
+                        )}
                         <RowAction
                           icon={RefreshCw}
                           label="Re-run AI"
@@ -422,8 +441,11 @@ export function AssetsDashboardPage() {
       />
       <AnalysisDetailModal
         open={analysisModal.open}
-        onClose={() => setAnalysisModal({ open: false, analysis: null, assetId: null, analyses: [] })}
+        onClose={() =>
+          setAnalysisModal({ open: false, analysis: null, asset: null, assetId: null, analyses: [] })
+        }
         analysis={analysisModal.analysis}
+        asset={analysisModal.asset}
         assetId={analysisModal.assetId}
         analyses={analysisModal.analyses}
       />

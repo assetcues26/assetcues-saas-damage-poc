@@ -255,6 +255,32 @@ export async function updateSaasAsset(assetId, metadata, options = {}) {
   return body;
 }
 
+/**
+ * @param {string} assetId
+ * @param {{ assetImage?: File, barcodeImage?: File }} files
+ * @param {{ reanalyze?: boolean }} [options]
+ */
+export async function uploadSaasAssetImages(assetId, files, options = {}) {
+  const form = new FormData();
+  if (files.assetImage) form.append('assetimage', files.assetImage);
+  if (files.barcodeImage) form.append('barcodeimage', files.barcodeImage);
+
+  const search = options.reanalyze === false ? '?reanalyze=false' : '?reanalyze=true';
+  const response = await fetch(
+    `${SAAS_BASE}/assets/${encodeURIComponent(assetId)}/images${search}`,
+    {
+      method: 'POST',
+      headers: saasHeaders(),
+      body: form,
+    },
+  );
+  const body = await parseJsonResponse(response);
+  if (!response.ok) {
+    throw new Error(formatApiErrorMessage(body, response.status));
+  }
+  return body;
+}
+
 export async function deleteSaasAsset(assetId) {
   const response = await fetch(`${SAAS_BASE}/assets/${encodeURIComponent(assetId)}`, {
     method: 'DELETE',

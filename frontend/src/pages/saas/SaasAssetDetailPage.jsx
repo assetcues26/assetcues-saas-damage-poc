@@ -11,13 +11,17 @@ import {
 } from '../../services/saasAssetsApi';
 import { exportSaasAssetReportPdf } from '../../services/exportSaasAssetReportPdf';
 import { AnalysisDetailModal } from '../../components/saas/AnalysisDetailModal';
+import { AddAssetPhotosPanel } from '../../components/saas/AddAssetPhotosPanel';
+import { AnalysisReportView } from '../../components/saas/AnalysisReportView';
 import { withAnalyzingState } from '../../utils/saasAssetState';
 import { useApp } from '../../context/AppContext';
+import { useSaasAssets } from '../../context/SaasAssetsContext';
 
 export function SaasAssetDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useApp();
+  const { refresh, markAssetAnalyzing } = useSaasAssets();
   const [detail, setDetail] = useState(null);
   const [analyses, setAnalyses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +83,18 @@ export function SaasAssetDetailPage() {
   }
 
   const asset = detail.asset;
+  const needsPhotos = !asset.asset_image_url;
+
+  const handlePhotosComplete = async () => {
+    await Promise.all([load({ silent: true }), refresh({ silent: true })]);
+  };
+
+  const handlePhotosAnalyzing = () => {
+    markAssetAnalyzing(id);
+    setDetail((prev) =>
+      prev?.asset ? { ...prev, asset: withAnalyzingState(prev.asset) } : prev,
+    );
+  };
 
   return (
     <div className="p-6">
@@ -88,7 +104,14 @@ export function SaasAssetDetailPage() {
           Dashboard
         </Button>
         <h1 className="text-2xl font-bold text-gray-900">{asset.assetname}</h1>
-        <AiStatusBadge status={asset.ai_status} />
+        <AiStatusBadge
+          status={asset.ai_status}
+          onClick={
+            detail.latest_analysis?.response_json
+              ? () => document.getElementById('ai-validation-report')?.scrollIntoView({ behavior: 'smooth' })
+              : undefined
+          }
+        />
         <div className="ml-auto flex gap-2">
           <Button variant="outline" size="sm" onClick={() => navigate(`/assets/${id}/edit`)}>
             Edit
@@ -108,6 +131,17 @@ export function SaasAssetDetailPage() {
           </Button>
         </div>
       </div>
+
+      {needsPhotos && (
+        <div className="mb-6">
+          <AddAssetPhotosPanel
+            assetId={id}
+            assetName={asset.assetname || asset.assetid}
+            onAnalyzing={handlePhotosAnalyzing}
+            onComplete={handlePhotosComplete}
+          />
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="lg:col-span-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -155,6 +189,17 @@ export function SaasAssetDetailPage() {
         </section>
       </div>
 
+      {detail.latest_analysis?.response_json && asset.ai_status !== 'analyzing' && (
+        <section id="ai-validation-report" className="mb-6">
+          <AnalysisReportView
+            analysis={detail.latest_analysis}
+            asset={asset}
+            aiStatus={asset.ai_status}
+            analyzedAt={detail.latest_analysis.created_at}
+          />
+        </section>
+      )}
+
       <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold uppercase text-gray-500">Analysis history</h2>
         <ul className="divide-y divide-gray-100">
@@ -187,6 +232,7 @@ export function SaasAssetDetailPage() {
         open={analysisModal.open}
         onClose={() => setAnalysisModal({ open: false, analysis: null })}
         analysis={analysisModal.analysis}
+        asset={asset}
         assetId={id}
         analyses={analyses}
       />
