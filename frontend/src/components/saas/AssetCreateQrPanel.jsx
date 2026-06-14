@@ -103,7 +103,7 @@ export function AssetCreateQrPanel({
         const session = await fetchAssetCreateSession(token);
         if (session.expires_at) setExpiresAt(session.expires_at);
         if (session.asset_image_url || session.barcode_image_url) {
-          onSessionImages?.(session);
+          onSessionImages?.({ ...session, session_token: token });
           setSynced(true);
           setPulse(true);
           window.setTimeout(() => setPulse(false), 1200);

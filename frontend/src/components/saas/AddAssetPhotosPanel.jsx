@@ -68,6 +68,9 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
 
   const onSessionImages = useCallback(
     (session) => {
+      if (session.session_token) {
+        setSessionToken(session.session_token);
+      }
       if (session.asset_image_url) {
         setSessionAssetUrl(session.asset_image_url);
         setAssetFile(null);
@@ -145,6 +148,7 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
         <AssetCreateQrPanel
           mode="images_only"
           draftJson={sessionDraft}
+          autoStart
           onSessionImages={onSessionImages}
           onSessionStarted={setSessionToken}
           title="Upload from mobile"

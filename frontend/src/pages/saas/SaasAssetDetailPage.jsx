@@ -86,7 +86,7 @@ export function SaasAssetDetailPage() {
   const needsPhotos = !asset.asset_image_url;
 
   const handlePhotosComplete = async () => {
-    await refreshAll({ silent: true });
+    await Promise.all([load({ silent: true }), refreshAll({ silent: true })]);
   };
 
   const handlePhotosAnalyzing = () => {

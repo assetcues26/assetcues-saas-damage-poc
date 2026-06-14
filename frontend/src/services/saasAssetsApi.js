@@ -283,6 +283,11 @@ export async function uploadSaasAssetImages(assetId, files, options = {}) {
   );
   const body = await parseJsonResponse(response);
   if (!response.ok) {
+    if (response.status === 404 || response.status === 405) {
+      throw new Error(
+        'Photo upload API is unavailable — restart the backend (port 8000) or redeploy the latest backend on Vercel.',
+      );
+    }
     throw new Error(formatApiErrorMessage(body, response.status));
   }
   return body;
