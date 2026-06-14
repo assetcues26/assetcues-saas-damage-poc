@@ -25,6 +25,7 @@ from app.models.saas_assets import (
 )
 from app.services.tagging_ai_client import (
     analyze_asset_with_tagging_ai,
+    apply_image_readability,
     compute_ai_status,
     extract_summary_fields,
 )

@@ -1,6 +1,13 @@
 """Tests for Tagging AI pass/fail computation."""
 
-from app.services.tagging_ai_client import compute_ai_status, resolve_image_readability
+from app.services.tagging_ai_client import apply_image_readability, compute_ai_status, resolve_image_readability
+
+
+def test_repository_exports_apply_image_readability_import():
+    """Regression: run_analysis crashed when this import was missing."""
+    from app.services import saas_assets_repository
+
+    assert saas_assets_repository.apply_image_readability is apply_image_readability
 
 
 def _full_pass_response():
