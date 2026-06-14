@@ -19,7 +19,7 @@ export function EditAssetPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useApp();
-  const { refresh, markAssetAnalyzing } = useSaasAssets();
+  const { refresh, refreshAll, markAssetAnalyzing } = useSaasAssets();
   const [values, setValues] = useState({ ...EMPTY_ASSET_FORM });
   const [hasAssetImage, setHasAssetImage] = useState(true);
   const [step, setStep] = useState(0);
@@ -96,7 +96,7 @@ export function EditAssetPage() {
             onAnalyzing={() => markAssetAnalyzing(id)}
             onComplete={async () => {
               setHasAssetImage(true);
-              await refresh({ silent: true });
+              await refreshAll({ silent: true });
               const d = await fetchSaasAsset(id);
               const a = d.asset || {};
               setValues((prev) => ({

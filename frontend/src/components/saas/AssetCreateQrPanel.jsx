@@ -24,6 +24,7 @@ function notifyDesktop(title, body) {
  *   draftJson: Record<string, unknown>,
  *   onSessionImages?: (session: object) => void,
  *   onSessionCompleted?: (session: object) => void,
+ *   onSessionStarted?: (token: string) => void,
  *   onQrReady?: () => void,
  *   autoStart?: boolean,
  *   title?: string,
@@ -35,6 +36,7 @@ export function AssetCreateQrPanel({
   draftJson,
   onSessionImages,
   onSessionCompleted,
+  onSessionStarted,
   onQrReady,
   autoStart = false,
   title,
@@ -63,6 +65,7 @@ export function AssetCreateQrPanel({
       setToken(body.session_token);
       setExpiresAt(body.expires_at);
       setSynced(false);
+      onSessionStarted?.(body.session_token);
       showToast('Scan the QR code with your phone', 'success');
       if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
         Notification.requestPermission().catch(() => {});
@@ -72,7 +75,7 @@ export function AssetCreateQrPanel({
     } finally {
       setLoading(false);
     }
-  }, [draftJson, sessionMode, showToast]);
+  }, [draftJson, sessionMode, showToast, onSessionStarted]);
 
   useEffect(() => {
     if (!autoStart || token || loading || startAttempted) return;

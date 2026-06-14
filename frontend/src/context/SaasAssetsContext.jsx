@@ -12,9 +12,12 @@ import { isAssetAnalyzing, withAnalyzingState } from '../utils/saasAssetState';
 
 const SaasAssetsContext = createContext(null);
 
-const POLL_MS = 5000;
-const POLL_MS_ANALYZING = 2000;
-const ACTIVITY_POLL_MS = 10000;
+const POLL_MS = 8000;
+const POLL_MS_ANALYZING = 3500;
+const STATS_POLL_MS = 15000;
+const STATS_POLL_MS_ANALYZING = 8000;
+const ACTIVITY_POLL_MS = 30000;
+const ACTIVITY_POLL_MS_ANALYZING = 15000;
 const PAGE_SIZE = 25;
 
 function computeStatsFromAssets(items, total) {
@@ -54,7 +57,9 @@ export function SaasAssetsProvider({ children }) {
   const [selectedIds, setSelectedIds] = useState([]);
   const [stats, setStats] = useState(null);
   const [activity, setActivity] = useState([]);
+  const [activityReady, setActivityReady] = useState(false);
   const pollRef = useRef(null);
+  const statsPollRef = useRef(null);
   const activityRef = useRef(null);
 
   const markAssetAnalyzing = useCallback((assetId) => {
@@ -122,10 +127,22 @@ export function SaasAssetsProvider({ children }) {
     try {
       const body = await fetchActivity(20);
       setActivity(body.items || []);
+      setActivityReady(true);
     } catch {
       /* ignore */
     }
   }, []);
+
+  const refreshAll = useCallback(
+    async (opts = {}) => {
+      await Promise.all([
+        load(opts),
+        loadStats(),
+        loadActivity(),
+      ]);
+    },
+    [load, loadStats, loadActivity],
+  );
 
   useEffect(() => {
     load();
@@ -145,19 +162,33 @@ export function SaasAssetsProvider({ children }) {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(() => {
       load({ silent: true });
-      loadStats();
     }, hasAnalyzing ? POLL_MS_ANALYZING : POLL_MS);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [load, loadStats, hasAnalyzing]);
+  }, [load, hasAnalyzing]);
 
   useEffect(() => {
-    activityRef.current = setInterval(loadActivity, ACTIVITY_POLL_MS);
+    if (statsPollRef.current) clearInterval(statsPollRef.current);
+    statsPollRef.current = setInterval(
+      loadStats,
+      hasAnalyzing ? STATS_POLL_MS_ANALYZING : STATS_POLL_MS,
+    );
+    return () => {
+      if (statsPollRef.current) clearInterval(statsPollRef.current);
+    };
+  }, [loadStats, hasAnalyzing]);
+
+  useEffect(() => {
+    if (activityRef.current) clearInterval(activityRef.current);
+    activityRef.current = setInterval(
+      loadActivity,
+      hasAnalyzing ? ACTIVITY_POLL_MS_ANALYZING : ACTIVITY_POLL_MS,
+    );
     return () => {
       if (activityRef.current) clearInterval(activityRef.current);
     };
-  }, [loadActivity]);
+  }, [loadActivity, hasAnalyzing]);
 
   const runAnalysis = useCallback(
     async (assetId) => {
@@ -242,7 +273,9 @@ export function SaasAssetsProvider({ children }) {
       toggleSelectAll,
       stats,
       activity,
+      activityReady,
       refresh: load,
+      refreshAll,
       runAnalysis,
       markAssetAnalyzing,
       bulkAnalyze,
@@ -262,7 +295,9 @@ export function SaasAssetsProvider({ children }) {
       selectedIds,
       stats,
       activity,
+      activityReady,
       load,
+      refreshAll,
       runAnalysis,
       markAssetAnalyzing,
       bulkAnalyze,

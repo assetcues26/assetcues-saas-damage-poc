@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { useSaasAssets } from '../../context/SaasAssetsContext';
 import { useApp } from '../../context/AppContext';
+import {
+  loadSeenActivityToastIds,
+  saveSeenActivityToastIds,
+  shouldToastActivityEvent,
+} from '../../utils/activityToast';
 
 function formatActivityTime(createdAt) {
   if (!createdAt) return '';
@@ -13,35 +18,60 @@ function formatActivityTime(createdAt) {
 }
 
 export function ActivityNotificationBell() {
-  const { activity } = useSaasAssets();
+  const { activity, activityReady } = useSaasAssets();
   const { showToast } = useApp();
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const rootRef = useRef(null);
   const knownIdsRef = useRef(new Set());
-  const baselineSetRef = useRef(false);
+  const toastedIdsRef = useRef(loadSeenActivityToastIds());
+  const baselineDoneRef = useRef(false);
 
   useEffect(() => {
+    if (!activityReady) return;
+
     const known = knownIdsRef.current;
+    const toasted = toastedIdsRef.current;
     const incoming = activity || [];
-    const newItems = incoming.filter((item) => item.id && !known.has(item.id));
 
-    incoming.forEach((item) => {
-      if (item.id) known.add(item.id);
-    });
-
-    if (!baselineSetRef.current) {
-      baselineSetRef.current = true;
+    if (!baselineDoneRef.current) {
+      incoming.forEach((item) => {
+        if (item.id) {
+          known.add(String(item.id));
+          toasted.add(String(item.id));
+        }
+      });
+      saveSeenActivityToastIds(toasted);
+      baselineDoneRef.current = true;
       return;
     }
 
-    if (newItems.length > 0) {
-      setUnreadCount((count) => count + newItems.length);
-      newItems.forEach((item) => {
+    const newItems = incoming.filter(
+      (item) => item.id && !known.has(String(item.id)),
+    );
+
+    incoming.forEach((item) => {
+      if (item.id) known.add(String(item.id));
+    });
+
+    if (newItems.length === 0) return;
+
+    let unreadAdded = 0;
+    newItems.forEach((item) => {
+      const id = String(item.id);
+      unreadAdded += 1;
+
+      if (!toasted.has(id) && shouldToastActivityEvent(item)) {
         showToast(item.message || 'New activity', 'info');
-      });
+        toasted.add(id);
+      }
+    });
+
+    saveSeenActivityToastIds(toasted);
+    if (unreadAdded > 0) {
+      setUnreadCount((count) => count + unreadAdded);
     }
-  }, [activity, showToast]);
+  }, [activity, activityReady, showToast]);
 
   useEffect(() => {
     if (!open) return undefined;

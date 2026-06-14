@@ -6,12 +6,6 @@ import { uploadSaasAssetImages } from '../../services/saasAssetsApi';
 import { useApp } from '../../context/AppContext';
 import { SESSION_MODE_IMAGES_ONLY } from './assetFormConfig';
 
-async function fileFromUrl(url, filename) {
-  const res = await fetch(url);
-  const blob = await res.blob();
-  return new File([blob], filename, { type: blob.type || 'image/jpeg' });
-}
-
 /**
  * Upload photos to an existing asset (e.g. metadata-only / pending registration).
  *
@@ -30,6 +24,7 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
   const [barcodePreview, setBarcodePreview] = useState(null);
   const [sessionAssetUrl, setSessionAssetUrl] = useState(null);
   const [sessionBarcodeUrl, setSessionBarcodeUrl] = useState(null);
+  const [sessionToken, setSessionToken] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -90,6 +85,7 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
   );
 
   const hasAssetImage = Boolean(assetFile || sessionAssetUrl);
+  const useSessionUpload = Boolean(sessionToken && sessionAssetUrl && !assetFile);
   const displayAssetPreview = assetPreview || sessionAssetUrl;
   const displayBarcodePreview = barcodePreview || sessionBarcodeUrl;
 
@@ -102,19 +98,18 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
     setError(null);
     onAnalyzing?.();
     try {
-      let imageFile = assetFile;
-      if (!imageFile && sessionAssetUrl) {
-        imageFile = await fileFromUrl(sessionAssetUrl, 'asset.jpg');
+      if (useSessionUpload) {
+        await uploadSaasAssetImages(
+          assetId,
+          {},
+          { sessionToken },
+        );
+      } else {
+        await uploadSaasAssetImages(assetId, {
+          assetImage: assetFile || undefined,
+          barcodeImage: barcodeFile || undefined,
+        });
       }
-      let barcode = barcodeFile;
-      if (!barcode && sessionBarcodeUrl) {
-        barcode = await fileFromUrl(sessionBarcodeUrl, 'barcode.jpg');
-      }
-
-      await uploadSaasAssetImages(assetId, {
-        assetImage: imageFile,
-        barcodeImage: barcode || undefined,
-      });
       showToast(
         `Photos saved for ${assetName || 'asset'} — AI analysis started`,
         'success',
@@ -123,10 +118,10 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
       setBarcodeFile(null);
       setSessionAssetUrl(null);
       setSessionBarcodeUrl(null);
+      setSessionToken(null);
       await onComplete?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed');
-      await onComplete?.();
     } finally {
       setUploading(false);
     }
@@ -151,6 +146,7 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
           mode="images_only"
           draftJson={sessionDraft}
           onSessionImages={onSessionImages}
+          onSessionStarted={setSessionToken}
           title="Upload from mobile"
           description="Scan the QR code to capture or upload asset and barcode photos from your phone. Images sync here automatically."
         />

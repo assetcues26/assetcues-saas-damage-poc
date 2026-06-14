@@ -258,20 +258,27 @@ export async function updateSaasAsset(assetId, metadata, options = {}) {
 /**
  * @param {string} assetId
  * @param {{ assetImage?: File, barcodeImage?: File }} files
- * @param {{ reanalyze?: boolean }} [options]
+ * @param {{ reanalyze?: boolean, sessionToken?: string }} [options]
  */
 export async function uploadSaasAssetImages(assetId, files, options = {}) {
-  const form = new FormData();
-  if (files.assetImage) form.append('assetimage', files.assetImage);
-  if (files.barcodeImage) form.append('barcodeimage', files.barcodeImage);
+  const search = new URLSearchParams();
+  if (options.reanalyze === false) search.set('reanalyze', 'false');
+  if (options.sessionToken) search.set('session_token', options.sessionToken);
 
-  const search = options.reanalyze === false ? '?reanalyze=false' : '?reanalyze=true';
+  const hasFiles = Boolean(files?.assetImage || files?.barcodeImage);
+  const query = search.toString() ? `?${search}` : '';
+
   const response = await fetch(
-    `${SAAS_BASE}/assets/${encodeURIComponent(assetId)}/images${search}`,
+    `${SAAS_BASE}/assets/${encodeURIComponent(assetId)}/images${query}`,
     {
       method: 'POST',
       headers: saasHeaders(),
-      body: form,
+      body: hasFiles ? (() => {
+        const form = new FormData();
+        if (files.assetImage) form.append('assetimage', files.assetImage);
+        if (files.barcodeImage) form.append('barcodeimage', files.barcodeImage);
+        return form;
+      })() : undefined,
     },
   );
   const body = await parseJsonResponse(response);

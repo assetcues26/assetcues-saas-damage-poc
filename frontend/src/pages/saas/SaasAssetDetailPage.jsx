@@ -21,7 +21,7 @@ export function SaasAssetDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useApp();
-  const { refresh, markAssetAnalyzing } = useSaasAssets();
+  const { refresh, refreshAll, markAssetAnalyzing } = useSaasAssets();
   const [detail, setDetail] = useState(null);
   const [analyses, setAnalyses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +49,7 @@ export function SaasAssetDetailPage() {
 
   useEffect(() => {
     if (detail?.asset?.ai_status !== 'analyzing') return undefined;
-    const timer = setInterval(() => load({ silent: true }), 2000);
+    const timer = setInterval(() => load({ silent: true }), 3500);
     return () => clearInterval(timer);
   }, [detail?.asset?.ai_status, load]);
 
@@ -86,7 +86,7 @@ export function SaasAssetDetailPage() {
   const needsPhotos = !asset.asset_image_url;
 
   const handlePhotosComplete = async () => {
-    await Promise.all([load({ silent: true }), refresh({ silent: true })]);
+    await refreshAll({ silent: true });
   };
 
   const handlePhotosAnalyzing = () => {
