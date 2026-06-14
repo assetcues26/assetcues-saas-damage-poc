@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { CheckCircle2, Copy, QrCode, RefreshCw, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,8 @@ export function AssetCreateQrPanel({
   const [synced, setSynced] = useState(false);
   const [startAttempted, setStartAttempted] = useState(false);
   const [pulse, setPulse] = useState(false);
+  const lastAssetUrlRef = useRef(null);
+  const lastBarcodeUrlRef = useRef(null);
 
   const sessionMode = mode === 'images_only' ? SESSION_MODE_IMAGES_ONLY : SESSION_MODE_FULL_MOBILE;
   const scanUrl = token ? buildAssetCreateScanUrl(token, sessionMode) : null;
@@ -65,6 +67,8 @@ export function AssetCreateQrPanel({
       setToken(body.session_token);
       setExpiresAt(body.expires_at);
       setSynced(false);
+      lastAssetUrlRef.current = null;
+      lastBarcodeUrlRef.current = null;
       onSessionStarted?.(body.session_token);
       showToast('Scan the QR code with your phone', 'success');
       if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
@@ -102,13 +106,32 @@ export function AssetCreateQrPanel({
       try {
         const session = await fetchAssetCreateSession(token);
         if (session.expires_at) setExpiresAt(session.expires_at);
-        if (session.asset_image_url || session.barcode_image_url) {
-          onSessionImages?.({ ...session, session_token: token });
+
+        const newAsset =
+          session.asset_image_url &&
+          session.asset_image_url !== lastAssetUrlRef.current;
+        const newBarcode =
+          session.barcode_image_url &&
+          session.barcode_image_url !== lastBarcodeUrlRef.current;
+
+        if (newAsset || newBarcode) {
+          if (newAsset) lastAssetUrlRef.current = session.asset_image_url;
+          if (newBarcode) lastBarcodeUrlRef.current = session.barcode_image_url;
+          onSessionImages?.({
+            ...session,
+            session_token: token,
+            newAsset: Boolean(newAsset),
+            newBarcode: Boolean(newBarcode),
+          });
           setSynced(true);
           setPulse(true);
           window.setTimeout(() => setPulse(false), 1200);
-          notifyDesktop('Photos synced', 'New images arrived from your phone');
-          showToast('Photos synced from phone', 'success');
+          if (newAsset) {
+            notifyDesktop('Asset photo synced', 'Asset image arrived from your phone');
+          }
+          if (newBarcode) {
+            notifyDesktop('Barcode photo synced', 'Barcode image arrived from your phone');
+          }
         }
         if (session.status === 'completed') {
           notifyDesktop('Asset created', 'Mobile session completed');
@@ -121,7 +144,7 @@ export function AssetCreateQrPanel({
     poll();
     const id = setInterval(poll, 3000);
     return () => clearInterval(id);
-  }, [token, onSessionImages, onSessionCompleted, showToast]);
+  }, [token, onSessionImages, onSessionCompleted]);
 
   const copyUrl = async () => {
     if (!scanUrl) return;

@@ -207,6 +207,15 @@ export async function prepareMobileImageForUpload(file) {
 }
 
 /**
+ * SaaS asset/barcode photos — same ≤500KB cap as mobile POC before Tagging AI upload.
+ * @param {File} file
+ * @returns {Promise<File>}
+ */
+export async function prepareSaasPhotoForUpload(file) {
+  return prepareMobileImageForUpload(file);
+}
+
+/**
  * Sum byte_size from session image list.
  * @param {Array<{ byte_size?: number | null }>} images
  */

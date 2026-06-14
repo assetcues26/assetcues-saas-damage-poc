@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '../../components/ui/Spinner';
 import { AiStatusBadge, MatchBadge } from '../../components/saas/AiStatusBadge';
 import {
+  deleteSaasAssetImage,
   fetchSaasAsset,
   fetchSaasAssetAnalyses,
   runSaasAssetAnalysis,
@@ -26,6 +27,7 @@ export function SaasAssetDetailPage() {
   const [analyses, setAnalyses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [rerunning, setRerunning] = useState(false);
+  const [deletingImage, setDeletingImage] = useState(null);
   const [analysisModal, setAnalysisModal] = useState({ open: false, analysis: null });
 
   const load = useCallback(async (opts = {}) => {
@@ -94,6 +96,23 @@ export function SaasAssetDetailPage() {
     setDetail((prev) =>
       prev?.asset ? { ...prev, asset: withAnalyzingState(prev.asset) } : prev,
     );
+  };
+
+  const handleDeleteImage = async (kind) => {
+    setDeletingImage(kind);
+    try {
+      const result = await deleteSaasAssetImage(id, kind);
+      setDetail((prev) => (prev ? { ...prev, asset: result.asset } : prev));
+      showToast(
+        `${kind === 'asset' ? 'Asset' : 'Barcode'} photo removed — upload a new one below`,
+        'success',
+      );
+      await refreshAll({ silent: true });
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Failed to remove photo', 'error');
+    } finally {
+      setDeletingImage(null);
+    }
   };
 
   return (
@@ -165,12 +184,29 @@ export function SaasAssetDetailPage() {
           </dl>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             {asset.asset_image_url && (
-              <img src={asset.asset_image_url} alt="Asset" className="rounded-xl border object-cover" />
+              <AssetPhotoCard
+                label="Asset photo"
+                src={asset.asset_image_url}
+                alt="Asset"
+                deleting={deletingImage === 'asset'}
+                onDelete={() => handleDeleteImage('asset')}
+              />
             )}
             {asset.barcode_image_url && (
-              <img src={asset.barcode_image_url} alt="Barcode" className="rounded-xl border object-cover" />
+              <AssetPhotoCard
+                label="Barcode photo"
+                src={asset.barcode_image_url}
+                alt="Barcode"
+                deleting={deletingImage === 'barcode'}
+                onDelete={() => handleDeleteImage('barcode')}
+              />
             )}
           </div>
+          {(asset.asset_image_url || asset.barcode_image_url) && (
+            <p className="mt-3 text-xs text-gray-500">
+              Remove a photo to upload a replacement from your computer or phone.
+            </p>
+          )}
         </section>
 
         <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -246,5 +282,26 @@ function Row({ label, value }) {
       <span className="text-gray-600">{label}</span>
       <MatchBadge value={value} />
     </p>
+  );
+}
+
+function AssetPhotoCard({ label, src, alt, deleting, onDelete }) {
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-gray-200">
+      <img src={src} alt={alt} className="h-48 w-full object-cover" />
+      <div className="flex items-center justify-between gap-2 border-t border-gray-100 bg-gray-50 px-3 py-2">
+        <span className="text-xs font-medium text-gray-600">{label}</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={deleting}
+          onClick={onDelete}
+          className="text-red-600 hover:bg-red-50 hover:text-red-700"
+        >
+          <Trash2 size={14} className="mr-1" />
+          {deleting ? 'Removing…' : 'Remove'}
+        </Button>
+      </div>
+    </div>
   );
 }

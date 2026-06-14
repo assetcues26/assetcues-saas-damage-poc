@@ -1,5 +1,6 @@
 import { ASSET_ANALYSIS_API_BASE } from '../config/api';
 import { formatApiErrorMessage } from '../utils/apiErrorMessage';
+import { prepareSaasPhotoForUpload } from '../utils/imageCompression';
 
 const SAAS_BASE = `${ASSET_ANALYSIS_API_BASE}/v1/saas`;
 
@@ -58,21 +59,37 @@ export async function fetchSaasAsset(assetId) {
   return body;
 }
 
+async function prepareSaasUploadFiles(files = {}) {
+  const prepared = {};
+  if (files.assetImage) {
+    prepared.assetImage = await prepareSaasPhotoForUpload(files.assetImage);
+  }
+  if (files.barcodeImage) {
+    prepared.barcodeImage = await prepareSaasPhotoForUpload(files.barcodeImage);
+  }
+  return prepared;
+}
+
 /**
  * @param {Record<string, string|number|undefined>} metadata
  * @param {File} assetImage
  * @param {File} [barcodeImage]
  */
 export async function createSaasAsset(metadata, assetImage, barcodeImage) {
+  const compressedAsset = await prepareSaasPhotoForUpload(assetImage);
+  const compressedBarcode = barcodeImage
+    ? await prepareSaasPhotoForUpload(barcodeImage)
+    : undefined;
+
   const form = new FormData();
   Object.entries(metadata).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
       form.append(key, String(value));
     }
   });
-  form.append('assetimage', assetImage);
-  if (barcodeImage) {
-    form.append('barcodeimage', barcodeImage);
+  form.append('assetimage', compressedAsset);
+  if (compressedBarcode) {
+    form.append('barcodeimage', compressedBarcode);
   }
 
   const response = await fetch(`${SAAS_BASE}/assets`, {
@@ -154,8 +171,9 @@ export async function fetchAssetCreateSession(token) {
  * @param {File} file
  */
 export async function uploadAssetCreateSessionImage(token, fieldName, file) {
+  const prepared = await prepareSaasPhotoForUpload(file);
   const form = new FormData();
-  form.append(fieldName, file);
+  form.append(fieldName, prepared);
 
   const response = await fetch(
     `${SAAS_BASE}/asset-sessions/${encodeURIComponent(token)}/images`,
@@ -268,17 +286,21 @@ export async function uploadSaasAssetImages(assetId, files, options = {}) {
   const hasFiles = Boolean(files?.assetImage || files?.barcodeImage);
   const query = search.toString() ? `?${search}` : '';
 
+  let requestBody;
+  if (hasFiles) {
+    const prepared = await prepareSaasUploadFiles(files);
+    const form = new FormData();
+    if (prepared.assetImage) form.append('assetimage', prepared.assetImage);
+    if (prepared.barcodeImage) form.append('barcodeimage', prepared.barcodeImage);
+    requestBody = form;
+  }
+
   const response = await fetch(
     `${SAAS_BASE}/assets/${encodeURIComponent(assetId)}/images${query}`,
     {
       method: 'POST',
       headers: saasHeaders(),
-      body: hasFiles ? (() => {
-        const form = new FormData();
-        if (files.assetImage) form.append('assetimage', files.assetImage);
-        if (files.barcodeImage) form.append('barcodeimage', files.barcodeImage);
-        return form;
-      })() : undefined,
+      body: requestBody,
     },
   );
   const body = await parseJsonResponse(response);
@@ -288,6 +310,25 @@ export async function uploadSaasAssetImages(assetId, files, options = {}) {
         'Photo upload API is unavailable — restart the backend (port 8000) or redeploy the latest backend on Vercel.',
       );
     }
+    throw new Error(formatApiErrorMessage(body, response.status));
+  }
+  return body;
+}
+
+/**
+ * @param {string} assetId
+ * @param {'asset' | 'barcode'} kind
+ */
+export async function deleteSaasAssetImage(assetId, kind) {
+  const response = await fetch(
+    `${SAAS_BASE}/assets/${encodeURIComponent(assetId)}/images?kind=${encodeURIComponent(kind)}`,
+    {
+      method: 'DELETE',
+      headers: saasHeaders(),
+    },
+  );
+  const body = await parseJsonResponse(response);
+  if (!response.ok) {
     throw new Error(formatApiErrorMessage(body, response.status));
   }
   return body;
