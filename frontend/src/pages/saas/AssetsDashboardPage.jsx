@@ -157,10 +157,11 @@ export function AssetsDashboardPage() {
   };
 
   const handleBulkAnalyze = async () => {
+    const count = selectedIds.length;
     setBulkBusy(true);
     try {
       await bulkAnalyze();
-      showToast('AI analysis queued for selected assets', 'success');
+      showToast(`AI analysis finished for ${count} asset(s)`, 'success');
     } finally {
       setBulkBusy(false);
     }

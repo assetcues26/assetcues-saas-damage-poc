@@ -4,14 +4,16 @@ import {
   exportAssetsCsv,
   fetchActivity,
   fetchDashboardStats,
+  fetchSaasAsset,
   fetchSaasAssetsList,
 } from '../services/saasAssetsApi';
 import { isAssetAnalyzing, withAnalyzingState } from '../utils/saasAssetState';
-import { mergePreservingImageUrls } from '../utils/mergeAssetList';
+import { mergePreservingImageUrls, mergePollAssetStatuses } from '../utils/mergeAssetList';
 import {
   enqueueAssetAnalysis,
   enqueueAssetAnalysesSequential,
   getAnalysisQueueLength,
+  getCurrentAnalysisAssetId,
   isAnalysisQueueBusy,
 } from '../utils/analysisQueue';
 
@@ -74,6 +76,45 @@ export function SaasAssetsProvider({ children }) {
     );
   }, []);
 
+  const applyAssetSummary = useCallback((summary) => {
+    if (!summary?.id) return;
+    setAssets((prev) =>
+      prev.map((asset) => (asset.id === summary.id ? { ...asset, ...summary } : asset)),
+    );
+  }, []);
+
+  const refreshAssetAfterAnalysis = useCallback(
+    async (assetId, status) => {
+      try {
+        const detail = await fetchSaasAsset(assetId);
+        if (detail?.asset) {
+          applyAssetSummary(detail.asset);
+          return;
+        }
+      } catch {
+        /* fall back to status only */
+      }
+      setAssets((prev) =>
+        prev.map((asset) =>
+          asset.id === assetId ? { ...asset, ai_status: status } : asset,
+        ),
+      );
+    },
+    [applyAssetSummary],
+  );
+
+  const analysisHooks = useMemo(
+    () => ({
+      onStart: (id) => markAssetAnalyzing(id),
+      onDone: (id, status) => {
+        if (status && status !== 'analyzing' && status !== 'timeout') {
+          refreshAssetAfterAnalysis(id, status);
+        }
+      },
+    }),
+    [markAssetAnalyzing, refreshAssetAfterAnalysis],
+  );
+
   const load = useCallback(async (opts = {}) => {
     const silent = opts.silent === true;
     if (!silent) setLoading(true);
@@ -89,7 +130,11 @@ export function SaasAssetsProvider({ children }) {
       setAssets((prev) => {
         const items = body.items || [];
         if (silent && prev.length) {
-          return mergePreservingImageUrls(prev, items);
+          return mergePollAssetStatuses(
+            mergePreservingImageUrls(prev, items),
+            prev,
+            getCurrentAnalysisAssetId(),
+          );
         }
         return items;
       });
@@ -199,9 +244,7 @@ export function SaasAssetsProvider({ children }) {
     async (assetId) => {
       markAssetAnalyzing(assetId);
       try {
-        await enqueueAssetAnalysis(assetId, {
-          onStart: (id) => markAssetAnalyzing(id),
-        });
+        await enqueueAssetAnalysis(assetId, analysisHooks);
         await load({ silent: true });
         await loadStats();
       } catch (err) {
@@ -209,15 +252,16 @@ export function SaasAssetsProvider({ children }) {
         throw err;
       }
     },
-    [load, loadStats, markAssetAnalyzing],
+    [load, loadStats, markAssetAnalyzing, analysisHooks],
   );
 
   const queueNewAssetAnalysis = useCallback(
     async (assetId) => {
       markAssetAnalyzing(assetId);
       enqueueAssetAnalysis(assetId, {
-        onStart: (id) => markAssetAnalyzing(id),
-        onDone: async () => {
+        ...analysisHooks,
+        onDone: async (id, status) => {
+          analysisHooks.onDone?.(id, status);
           await load({ silent: true });
           await loadStats();
         },
@@ -225,7 +269,7 @@ export function SaasAssetsProvider({ children }) {
         load({ silent: true });
       });
     },
-    [load, loadStats, markAssetAnalyzing],
+    [load, loadStats, markAssetAnalyzing, analysisHooks],
   );
 
   const toggleSelected = useCallback((id) => {
@@ -242,9 +286,7 @@ export function SaasAssetsProvider({ children }) {
     if (!selectedIds.length) return;
     const ids = [...selectedIds];
     try {
-      await enqueueAssetAnalysesSequential(ids, {
-        onStart: (id) => markAssetAnalyzing(id),
-      });
+      await enqueueAssetAnalysesSequential(ids, analysisHooks);
       setSelectedIds([]);
       await load({ silent: true });
       await loadStats();
@@ -252,18 +294,16 @@ export function SaasAssetsProvider({ children }) {
       await load({ silent: true });
       throw err;
     }
-  }, [selectedIds, load, loadStats, markAssetAnalyzing]);
+  }, [selectedIds, load, loadStats, analysisHooks]);
 
   const bulkAnalyzeIds = useCallback(
     async (assetIds) => {
       if (!assetIds.length) return;
-      await enqueueAssetAnalysesSequential(assetIds, {
-        onStart: (id) => markAssetAnalyzing(id),
-      });
+      await enqueueAssetAnalysesSequential(assetIds, analysisHooks);
       await load({ silent: true });
       await loadStats();
     },
-    [load, loadStats, markAssetAnalyzing],
+    [load, loadStats, analysisHooks],
   );
 
   const bulkDelete = useCallback(async () => {

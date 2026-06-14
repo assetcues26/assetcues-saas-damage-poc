@@ -826,7 +826,6 @@ async def clear_all_analyses(
 )
 async def bulk_analyze_assets(
     body: BulkAssetIdsRequest,
-    background_tasks: BackgroundTasks,
     repo: SaasAssetsRepository = Depends(get_repo),
     settings: Settings = Depends(get_settings),
     rate_limiter: RateLimiter = Depends(get_saas_rate_limiter),
@@ -835,9 +834,11 @@ async def bulk_analyze_assets(
     _require_saas(repo)
     queued = await repo.bulk_analyze(settings.demo_user_id, body.asset_ids)
     for aid in queued:
-        background_tasks.add_task(
-            _background_analyze, settings, aid, settings.demo_user_id, None
-        )
+        try:
+            await repo.run_analysis(settings.demo_user_id, aid, None)
+        except Exception as exc:
+            logger.exception("saas_bulk_analyze_item_failed", asset_id=aid, error=str(exc))
+            await repo.restore_ai_status_from_latest_analysis(aid)
     return BulkActionResponse(processed=len(queued), asset_ids=queued)
 
 

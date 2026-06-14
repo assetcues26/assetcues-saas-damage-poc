@@ -234,7 +234,7 @@ class SaasAssetsRepository:
                 latest_by_asset[aid] = row
         return latest_by_asset
 
-    STALE_ANALYZING_SECONDS = 120
+    STALE_ANALYZING_SECONDS = 60
 
     def _restore_ai_status_from_latest_sync(self, asset_id: str) -> str | None:
         latest = self._latest_analysis_for_asset(asset_id)
@@ -782,19 +782,21 @@ class SaasAssetsRepository:
             )
         except Exception as exc:
             logger.exception("saas_tagging_ai_failed", asset_id=asset_id, error=str(exc))
-            self._table("registered_assets").update({"ai_status": "error"}).eq("id", asset_id).execute()
-            self._table("asset_analyses").insert(
-                {
-                    "asset_id": asset_id,
-                    "user_id": user_id,
-                    "request_id": None,
-                    "response_json": {"error": str(exc)},
-                    "ai_status": "error",
-                    "failure_summary": {"error": str(exc)},
-                    "response_time_seconds": None,
-                }
-            ).execute()
-            return "error"
+            restored = self._restore_ai_status_from_latest_sync(asset_id)
+            if not restored:
+                self._table("registered_assets").update({"ai_status": "error"}).eq("id", asset_id).execute()
+                self._table("asset_analyses").insert(
+                    {
+                        "asset_id": asset_id,
+                        "user_id": user_id,
+                        "request_id": None,
+                        "response_json": {"error": str(exc)},
+                        "ai_status": "error",
+                        "failure_summary": {"error": str(exc)},
+                        "response_time_seconds": None,
+                    }
+                ).execute()
+            return restored or "error"
 
         apply_image_readability(
             response,

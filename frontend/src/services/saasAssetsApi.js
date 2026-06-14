@@ -5,6 +5,7 @@ import { withUploadRetries } from '../utils/uploadRetry';
 
 const SAAS_BASE = `${ASSET_ANALYSIS_API_BASE}/v1/saas`;
 const UPLOAD_TIMEOUT_MS = 120_000;
+const ANALYZE_TIMEOUT_MS = 300_000;
 
 function saasHeaders() {
   const headers = { Accept: 'application/json' };
@@ -158,15 +159,25 @@ export async function createSaasAsset(metadata, assetImage, barcodeImage, option
 }
 
 export async function runSaasAssetAnalysis(assetId) {
-  const response = await fetch(`${SAAS_BASE}/assets/${encodeURIComponent(assetId)}/analyze`, {
-    method: 'POST',
-    headers: saasHeaders(),
-  });
-  const body = await parseJsonResponse(response);
-  if (!response.ok) {
-    throw new Error(formatApiErrorMessage(body, response.status));
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+  try {
+    const response = await fetch(
+      `${SAAS_BASE}/assets/${encodeURIComponent(assetId)}/analyze`,
+      {
+        method: 'POST',
+        headers: saasHeaders(),
+        signal: controller.signal,
+      },
+    );
+    const body = await parseJsonResponse(response);
+    if (!response.ok) {
+      throw new Error(formatApiErrorMessage(body, response.status));
+    }
+    return body;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return body;
 }
 
 export async function fetchSaasAssetAnalyses(assetId) {

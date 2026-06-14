@@ -34,3 +34,28 @@ export function mergePreservingImageUrls(prevItems, nextItems) {
     };
   });
 }
+
+/**
+ * During bulk analysis only the active asset should show "analyzing".
+ * Other rows may still be stuck server-side from aborted runs — keep prior UI status.
+ *
+ * @param {Array<Record<string, unknown>>} items
+ * @param {Array<Record<string, unknown>>} prevItems
+ * @param {string | null} currentAnalyzingId
+ */
+export function mergePollAssetStatuses(items, prevItems, currentAnalyzingId) {
+  if (!currentAnalyzingId || !prevItems?.length) return items;
+
+  const prevById = new Map(prevItems.map((item) => [item.id, item]));
+
+  return items.map((item) => {
+    if (item.ai_status !== 'analyzing' || item.id === currentAnalyzingId) {
+      return item;
+    }
+    const prev = prevById.get(item.id);
+    if (!prev || prev.ai_status === 'analyzing') {
+      return item;
+    }
+    return { ...item, ai_status: prev.ai_status };
+  });
+}
