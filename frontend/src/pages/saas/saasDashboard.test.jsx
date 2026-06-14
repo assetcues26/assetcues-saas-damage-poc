@@ -63,6 +63,5 @@ describe('AssetsDashboardPage', () => {
     expect(screen.getByText('Assets Dashboard')).toBeInTheDocument();
     expect(screen.getByText('Total')).toBeInTheDocument();
     expect(screen.getByText('AST-1')).toBeInTheDocument();
-    expect(screen.getByText('Asset created')).toBeInTheDocument();
   });
 });

@@ -228,6 +228,19 @@ export async function fetchActivity(limit = 30) {
   return body;
 }
 
+export async function registerSaasAsset(metadata) {
+  const response = await fetch(`${SAAS_BASE}/assets/register`, {
+    method: 'POST',
+    headers: { ...saasHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(metadata),
+  });
+  const body = await parseJsonResponse(response);
+  if (!response.ok) {
+    throw new Error(formatApiErrorMessage(body, response.status));
+  }
+  return body;
+}
+
 export async function updateSaasAsset(assetId, metadata, options = {}) {
   const search = options.reanalyze ? '?reanalyze=true' : '';
   const response = await fetch(`${SAAS_BASE}/assets/${encodeURIComponent(assetId)}${search}`, {

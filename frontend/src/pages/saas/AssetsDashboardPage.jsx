@@ -61,7 +61,6 @@ export function AssetsDashboardPage() {
     toggleSelected,
     toggleSelectAll,
     stats,
-    activity,
     refresh,
     runAnalysis,
     markAssetAnalyzing,
@@ -165,8 +164,7 @@ export function AssetsDashboardPage() {
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-start">
-        <div className="flex-1">
+      <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Assets Dashboard</h1>
           <p className="text-sm text-gray-600">{total} registered assets</p>
 
@@ -192,25 +190,6 @@ export function AssetsDashboardPage() {
               </button>
             ))}
           </div>
-        </div>
-
-        <aside className="w-full shrink-0 rounded-xl border border-gray-200 bg-white p-4 shadow-sm xl:w-72">
-          <h2 className="mb-3 text-xs font-semibold uppercase text-gray-500">Activity</h2>
-          <ul className="max-h-48 space-y-2 overflow-y-auto text-xs text-gray-600">
-            {activity.length === 0 ? (
-              <li>No recent activity</li>
-            ) : (
-              activity.map((ev) => (
-                <li key={ev.id}>
-                  <span className="text-gray-900">{ev.message}</span>
-                  <span className="ml-1 text-gray-400">
-                    · {ev.created_at ? new Date(ev.created_at).toLocaleTimeString() : ''}
-                  </span>
-                </li>
-              ))
-            )}
-          </ul>
-        </aside>
       </div>
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
