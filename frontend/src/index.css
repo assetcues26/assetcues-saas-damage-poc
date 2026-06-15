@@ -59,6 +59,21 @@
     overflow-x: hidden;
     max-width: 100%;
   }
+
+  /* SaaS shell: hide desktop sidebar before JS hydrates on phones */
+  @media (max-width: 1023px) {
+    [data-saas-sidebar],
+    .saas-shell-sidebar {
+      display: none !important;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    [data-saas-mobile-nav],
+    .saas-shell-mobile-nav {
+      display: none !important;
+    }
+  }
 }
 
 @layer utilities {
