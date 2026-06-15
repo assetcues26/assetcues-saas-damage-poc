@@ -42,6 +42,8 @@ ASSET_METADATA_KEYS = (
     "description",
     "tagnumber",
     "assetnumber",
+    "serialnumber",
+    "sublocation",
     "assetclassid",
     "assetclassname",
     "categoryid",
@@ -56,6 +58,8 @@ ASSET_METADATA_KEYS = (
     "assettaggingdetailid",
     "cost",
     "acquisitiondate",
+    "latitude",
+    "longitude",
 )
 
 REQUIRED_CREATE_KEYS = (
@@ -195,6 +199,11 @@ class SaasAssetsRepository:
             return None
         return float(Decimal(str(value)))
 
+    def _normalize_coordinate(self, value: Any) -> float | None:
+        if value is None or value == "":
+            return None
+        return float(Decimal(str(value)))
+
     def _row_to_metadata(self, row: dict) -> dict[str, Any]:
         meta: dict[str, Any] = {}
         for key in ASSET_METADATA_KEYS:
@@ -324,6 +333,8 @@ class SaasAssetsRepository:
             description=row.get("description"),
             tagnumber=row.get("tagnumber"),
             assetnumber=row.get("assetnumber"),
+            serialnumber=row.get("serialnumber"),
+            sublocation=row.get("sublocation"),
             assetclassid=row.get("assetclassid"),
             assetclassname=row.get("assetclassname"),
             categoryid=row.get("categoryid"),
@@ -338,6 +349,8 @@ class SaasAssetsRepository:
             assettaggingdetailid=row.get("assettaggingdetailid"),
             cost=float(cost) if cost is not None else None,
             acquisitiondate=row.get("acquisitiondate"),
+            latitude=float(row["latitude"]) if row.get("latitude") is not None else None,
+            longitude=float(row["longitude"]) if row.get("longitude") is not None else None,
             ai_status=ai_status,
             asset_image_path=row.get("asset_image_path"),
             barcode_image_path=row.get("barcode_image_path"),
@@ -453,6 +466,8 @@ class SaasAssetsRepository:
         if not str(data.get("customerid") or "").strip() and str(data.get("companyid") or "").strip():
             data["customerid"] = str(data["companyid"]).strip()
         data["cost"] = self._normalize_cost(data.get("cost"))
+        data["latitude"] = self._normalize_coordinate(data.get("latitude"))
+        data["longitude"] = self._normalize_coordinate(data.get("longitude"))
         data["user_id"] = user_id
         data["ai_status"] = "pending"
 
@@ -753,6 +768,10 @@ class SaasAssetsRepository:
             }
             if "cost" in updates:
                 updates["cost"] = self._normalize_cost(updates["cost"])
+            if "latitude" in updates:
+                updates["latitude"] = self._normalize_coordinate(updates["latitude"])
+            if "longitude" in updates:
+                updates["longitude"] = self._normalize_coordinate(updates["longitude"])
             if updates:
                 upd = (
                     self._table("registered_assets")
@@ -1142,6 +1161,10 @@ class SaasAssetsRepository:
         }
         if "cost" in updates:
             updates["cost"] = self._normalize_cost(updates["cost"])
+        if "latitude" in updates:
+            updates["latitude"] = self._normalize_coordinate(updates["latitude"])
+        if "longitude" in updates:
+            updates["longitude"] = self._normalize_coordinate(updates["longitude"])
         if updates:
             upd = (
                 self._table("registered_assets")

@@ -172,14 +172,22 @@ export function SaasAssetDetailPage() {
           <h2 className="mb-4 text-sm font-semibold uppercase text-gray-500">Asset record</h2>
           <dl className="grid gap-3 sm:grid-cols-2 text-sm">
             {[
-              ['Asset ID', asset.assetid],
-              ['Tag', asset.tagnumber],
-              ['Company', asset.company],
+              ['Asset number', asset.assetnumber],
+              ['Asset name', asset.assetname],
+              ['Acquisition date', asset.acquisitiondate],
+              ['Cost', asset.cost != null ? `₹${Number(asset.cost).toLocaleString('en-IN')}` : '—'],
               ['Class', asset.assetclassname],
               ['Category', asset.categoryname],
-              ['Make/Model', asset.makemodelname],
-              ['Cost', asset.cost != null ? `₹${Number(asset.cost).toLocaleString('en-IN')}` : '—'],
-              ['Acquired', asset.acquisitiondate],
+              ['Tag number', asset.tagnumber],
+              ['Serial number', asset.serialnumber],
+              ['Sub location', asset.sublocation],
+              ['Sub category', asset.subcategoryname],
+              ['Make/model', asset.makemodelname],
+              ['Department', asset.company],
+              ['Latitude', asset.latitude],
+              ['Longitude', asset.longitude],
+              ['Asset ID', asset.assetid],
+              ['Company ID', asset.companyid],
             ].map(([label, val]) => (
               <div key={label}>
                 <dt className="text-xs font-medium text-gray-500">{label}</dt>

@@ -10,6 +10,7 @@ import {
   EMPTY_ASSET_FORM,
   assetFormToPayload,
   validateAssetForm,
+  getAssetFormFieldKeys,
 } from '../../../components/saas/assetFormConfig';
 import {
   fetchSaasAsset,
@@ -241,6 +242,7 @@ export function MobileAssetTagPage() {
           onPatch={(patch) => setValues((p) => ({ ...p, ...patch }))}
           compact
           hideAssetId
+          fieldKeys={getAssetFormFieldKeys()}
         />
       </section>
 

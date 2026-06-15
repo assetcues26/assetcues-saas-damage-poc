@@ -56,21 +56,17 @@ describe('assetFormConfig', () => {
     expect(payload._session_mode).toBeUndefined();
   });
 
-  it('validateWizardStep identity does not require make/model', () => {
-    const identity = {
+  it('validateWizardStep details requires make/model selection', () => {
+    const partial = {
       assetname: 'Test',
       tagnumber: '1',
       assetnumber: '2',
-      description: 'x',
-    };
-    expect(validateWizardStep(identity, 0)).toBeNull();
-  });
-
-  it('validateWizardStep classification requires make/model selection', () => {
-    const partial = {
       assetclassname: 'IT Equipment',
+      cost: '1000',
+      acquisitiondate: '15-08-2023',
+      companyid: 'COMP-1',
     };
-    expect(validateWizardStep(partial, 1)).toMatch(/Make\/model/);
+    expect(validateWizardStep(partial, 0)).toMatch(/Make\/model/);
   });
 
   it('draftJsonToFormValues ignores empty draft fields and session meta', () => {

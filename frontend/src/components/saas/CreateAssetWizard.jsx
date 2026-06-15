@@ -11,6 +11,7 @@ import {
 import { LookupSelect } from './LookupSelect';
 import { AssetDatePicker } from './AssetDatePicker';
 import { LookupIdHint } from './LookupIdHint';
+import { AssetGeoLocationFields } from './AssetGeoLocationFields';
 
 /**
  * @param {{
@@ -55,6 +56,20 @@ export function CreateAssetWizard({
   };
 
   const renderField = (key) => {
+    if (key === 'longitude') return null;
+    if (key === 'latitude') {
+      return (
+        <AssetGeoLocationFields
+          key="geo"
+          values={values}
+          onChange={onChange}
+          onPatch={onPatch}
+          compact
+          labelClass="text-xs font-medium text-gray-700"
+          inputClass="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        />
+      );
+    }
     if (hideAssetId && key === 'assetid') return null;
     const field = ASSET_FORM_FIELDS.find((f) => f.key === key);
     if (!field) return null;

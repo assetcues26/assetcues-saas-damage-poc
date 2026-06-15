@@ -14,6 +14,8 @@ class SaasAssetSummary(BaseModel):
     description: str | None = None
     tagnumber: str | None = None
     assetnumber: str | None = None
+    serialnumber: str | None = None
+    sublocation: str | None = None
     assetclassid: str | None = None
     assetclassname: str | None = None
     categoryid: str | None = None
@@ -28,6 +30,8 @@ class SaasAssetSummary(BaseModel):
     assettaggingdetailid: str | None = None
     cost: float | None = None
     acquisitiondate: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
     ai_status: str = "pending"
     asset_image_path: str | None = None
     barcode_image_path: str | None = None
@@ -131,6 +135,8 @@ class UpdateAssetRequest(BaseModel):
     description: str | None = None
     tagnumber: str | None = None
     assetnumber: str | None = None
+    serialnumber: str | None = None
+    sublocation: str | None = None
     assetclassid: str | None = None
     assetclassname: str | None = None
     categoryid: str | None = None
@@ -145,6 +151,8 @@ class UpdateAssetRequest(BaseModel):
     assettaggingdetailid: str | None = None
     cost: str | float | None = None
     acquisitiondate: str | None = None
+    latitude: str | float | None = None
+    longitude: str | float | None = None
 
 
 class RegisterAssetRequest(UpdateAssetRequest):

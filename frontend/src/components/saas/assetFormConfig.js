@@ -3,25 +3,33 @@ export const SESSION_MODE_FULL_MOBILE = 'full_mobile';
 export const MOBILE_STEP_DETAILS = 'details';
 export const MOBILE_STEP_PHOTOS = 'photos';
 
+/** User-facing field order for asset register / tag flows (photo is a separate step). */
+export const ASSET_PRIORITY_FIELD_KEYS = [
+  'assetnumber',
+  'assetname',
+  'acquisitiondate',
+  'cost',
+  'assetclassid',
+  'categoryid',
+  'tagnumber',
+  'serialnumber',
+  'sublocation',
+  'subcategoryid',
+  'makemodelid',
+  'companyid',
+  'latitude',
+  'longitude',
+];
+
 export const WIZARD_STEPS = [
   {
-    id: 'identity',
-    title: 'Identity',
-    fields: ['assetid', 'assetname', 'description', 'tagnumber', 'assetnumber'],
-  },
-  {
-    id: 'classification',
-    title: 'Classification',
-    fields: ['assetclassid', 'categoryid', 'subcategoryid', 'makemodelid'],
-  },
-  {
-    id: 'financial',
-    title: 'Financial',
-    fields: ['cost', 'acquisitiondate', 'companyid', 'customerid', 'assettaggingdetailid'],
+    id: 'details',
+    title: 'Asset details',
+    fields: [...ASSET_PRIORITY_FIELD_KEYS],
   },
   {
     id: 'photos',
-    title: 'Photos',
+    title: 'Photo',
     fields: [],
   },
   {
@@ -41,24 +49,28 @@ export const LOOKUP_FIELD_MAP = {
 
 export const ASSET_FORM_FIELDS = [
   { key: 'assetid', label: 'Asset ID', hint: 'Auto-assigned', autoAssign: true },
-  { key: 'assetname', label: 'Asset name', required: true },
-  { key: 'description', label: 'Description', type: 'textarea' },
-  { key: 'tagnumber', label: 'Tag number', required: true },
   { key: 'assetnumber', label: 'Asset number', required: true, autoAssign: true },
-  { key: 'assetclassid', label: 'Asset class ID', optional: true },
-  { key: 'assetclassname', label: 'Asset class name', required: true },
-  { key: 'categoryid', label: 'Category ID', optional: true },
-  { key: 'categoryname', label: 'Category name', optional: true },
-  { key: 'subcategoryid', label: 'Subcategory ID', optional: true },
-  { key: 'subcategoryname', label: 'Subcategory name', optional: true },
-  { key: 'makemodelid', label: 'Make/model ID', required: true },
-  { key: 'makemodelname', label: 'Make/model name', required: true },
-  { key: 'companyid', label: 'Company ID', required: true },
-  { key: 'company', label: 'Company', required: true },
-  { key: 'customerid', label: 'Customer ID', required: true, hint: 'Defaults to company ID' },
-  { key: 'assettaggingdetailid', label: 'Asset tagging detail ID', optional: true },
+  { key: 'assetname', label: 'Asset name', required: true },
+  { key: 'acquisitiondate', label: 'Acquisition date', required: true, placeholder: '15-08-2023' },
   { key: 'cost', label: 'Cost (INR)', type: 'number', required: true },
-  { key: 'acquisitiondate', label: 'Acquisition date (DD-MM-YYYY)', required: true, placeholder: '15-08-2023' },
+  { key: 'assetclassid', label: 'Class ID', optional: true },
+  { key: 'assetclassname', label: 'Class', required: true },
+  { key: 'categoryid', label: 'Category ID', optional: true },
+  { key: 'categoryname', label: 'Category', optional: true },
+  { key: 'tagnumber', label: 'Tag number', required: true },
+  { key: 'serialnumber', label: 'Serial number', optional: true },
+  { key: 'sublocation', label: 'Sub location', optional: true },
+  { key: 'subcategoryid', label: 'Sub category ID', optional: true },
+  { key: 'subcategoryname', label: 'Sub category', optional: true },
+  { key: 'makemodelid', label: 'Make/model ID', required: true },
+  { key: 'makemodelname', label: 'Make/model', required: true },
+  { key: 'companyid', label: 'Department ID', required: true },
+  { key: 'company', label: 'Department', required: true },
+  { key: 'description', label: 'Description', type: 'textarea', optional: true },
+  { key: 'customerid', label: 'Customer ID', required: true, hint: 'Defaults to department ID' },
+  { key: 'assettaggingdetailid', label: 'Asset tagging detail ID', optional: true },
+  { key: 'latitude', label: 'Latitude', type: 'coordinate', optional: true },
+  { key: 'longitude', label: 'Longitude', type: 'coordinate', optional: true },
 ];
 
 export const EMPTY_ASSET_FORM = Object.fromEntries(
@@ -66,6 +78,13 @@ export const EMPTY_ASSET_FORM = Object.fromEntries(
 );
 
 const DRAFT_INTERNAL_KEYS = new Set(['_session_mode', '_existing_asset_id', '_mobile_step']);
+
+function isValidCoordinate(value, min, max) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return true;
+  const num = Number(trimmed);
+  return Number.isFinite(num) && num >= min && num <= max;
+}
 
 /**
  * Strip session metadata and keep only non-empty form fields from a QR draft.
@@ -131,6 +150,26 @@ export function isRequiredFieldSatisfied(values, key) {
   return Boolean(String(values[key] || '').trim());
 }
 
+function validateFinancialFields(values) {
+  if (!/^\d{2}-\d{2}-\d{4}$/.test(String(values.acquisitiondate || '').trim())) {
+    return 'Acquisition date must be DD-MM-YYYY';
+  }
+  if (Number(values.cost) <= 0) {
+    return 'Cost must be a positive number';
+  }
+  return null;
+}
+
+function validateCoordinateFields(values) {
+  if (!isValidCoordinate(values.latitude, -90, 90)) {
+    return 'Latitude must be between -90 and 90';
+  }
+  if (!isValidCoordinate(values.longitude, -180, 180)) {
+    return 'Longitude must be between -180 and 180';
+  }
+  return null;
+}
+
 /**
  * @param {Record<string, string>} values
  * @param {number} stepIndex
@@ -139,6 +178,7 @@ export function validateWizardStep(values, stepIndex) {
   const step = WIZARD_STEPS[stepIndex];
   if (!step || step.id === 'photos' || step.id === 'review') return null;
   for (const key of step.fields) {
+    if (key === 'latitude' || key === 'longitude') continue;
     const lookup = LOOKUP_FIELD_MAP[key];
     if (lookup) {
       const nameField = ASSET_FORM_FIELDS.find((f) => f.key === lookup.nameKey);
@@ -152,13 +192,10 @@ export function validateWizardStep(values, stepIndex) {
       return `${field.label} is required`;
     }
   }
-  if (step.id === 'financial') {
-    if (!/^\d{2}-\d{2}-\d{4}$/.test(String(values.acquisitiondate || '').trim())) {
-      return 'Acquisition date must be DD-MM-YYYY';
-    }
-    if (Number(values.cost) <= 0) {
-      return 'Cost must be a positive number';
-    }
+  if (step.id === 'details') {
+    const financialError = validateFinancialFields(values);
+    if (financialError) return financialError;
+    return validateCoordinateFields(values);
   }
   return null;
 }
@@ -181,13 +218,9 @@ export function validateAssetForm(values) {
       return `${field.label} is required`;
     }
   }
-  if (!/^\d{2}-\d{2}-\d{4}$/.test(String(values.acquisitiondate || '').trim())) {
-    return 'Acquisition date must be DD-MM-YYYY';
-  }
-  if (Number(values.cost) <= 0) {
-    return 'Cost must be a positive number';
-  }
-  return null;
+  const financialError = validateFinancialFields(values);
+  if (financialError) return financialError;
+  return validateCoordinateFields(values);
 }
 
 /**
@@ -202,6 +235,8 @@ export function assetFormToPayload(values) {
   ASSET_FORM_FIELDS.filter((f) => f.optional).forEach((f) => {
     if (!payload[f.key]?.trim()) delete payload[f.key];
   });
+  if (payload.latitude != null) payload.latitude = String(payload.latitude).trim();
+  if (payload.longitude != null) payload.longitude = String(payload.longitude).trim();
   return payload;
 }
 
@@ -276,4 +311,13 @@ export function getSessionMode(draft) {
   if (draft?._session_mode === SESSION_MODE_IMAGES_ONLY) return SESSION_MODE_IMAGES_ONLY;
   if (draft?._session_mode === SESSION_MODE_FULL_MOBILE) return SESSION_MODE_FULL_MOBILE;
   return SESSION_MODE_FULL_MOBILE;
+}
+
+/**
+ * Ordered keys for rendering the priority asset form (geo fields grouped at end).
+ * @param {boolean} [includeGeo=true]
+ */
+export function getAssetFormFieldKeys(includeGeo = true) {
+  const withoutGeo = ASSET_PRIORITY_FIELD_KEYS.filter((k) => k !== 'latitude' && k !== 'longitude');
+  return includeGeo ? [...withoutGeo, 'latitude', 'longitude'] : withoutGeo;
 }

@@ -2,10 +2,12 @@ import {
   ASSET_FORM_FIELDS,
   LOOKUP_FIELD_MAP,
   buildLookupChangePatch,
+  getAssetFormFieldKeys,
 } from './assetFormConfig';
 import { LookupSelect } from './LookupSelect';
 import { AssetDatePicker } from './AssetDatePicker';
 import { LookupIdHint } from './LookupIdHint';
+import { AssetGeoLocationFields } from './AssetGeoLocationFields';
 
 /**
  * @param {{
@@ -42,9 +44,23 @@ export function AssetFormFields({
     }
   };
 
-  const keys = fieldKeys || ASSET_FORM_FIELDS.map((f) => f.key);
+  const keys = fieldKeys || getAssetFormFieldKeys();
 
   const renderField = (key) => {
+    if (key === 'longitude') return null;
+    if (key === 'latitude') {
+      return (
+        <AssetGeoLocationFields
+          key="geo"
+          values={values}
+          onChange={onChange}
+          onPatch={onPatch}
+          compact={compact}
+          labelClass={labelClass}
+          inputClass={inputClass}
+        />
+      );
+    }
     if (hideAssetId && key === 'assetid') return null;
     const field = ASSET_FORM_FIELDS.find((f) => f.key === key);
     if (!field) return null;
