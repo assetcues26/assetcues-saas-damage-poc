@@ -40,11 +40,11 @@ export const LOOKUP_FIELD_MAP = {
 };
 
 export const ASSET_FORM_FIELDS = [
-  { key: 'assetid', label: 'Asset ID', hint: 'Auto-assigned', autoAssign: true },
+  { key: 'assetid', label: 'Asset ID', hint: 'Preview — final ID assigned when you save', autoAssign: true },
   { key: 'assetname', label: 'Asset name', required: true },
   { key: 'description', label: 'Description', type: 'textarea' },
   { key: 'tagnumber', label: 'Tag number', required: true },
-  { key: 'assetnumber', label: 'Asset number', required: true, autoAssign: true },
+  { key: 'assetnumber', label: 'Asset number', required: true, autoAssign: true, hint: 'Preview — final number assigned when you save' },
   { key: 'assetclassid', label: 'Asset class ID', optional: true },
   { key: 'assetclassname', label: 'Asset class name', required: true },
   { key: 'categoryid', label: 'Category ID', optional: true },
@@ -192,13 +192,18 @@ export function validateAssetForm(values) {
 
 /**
  * @param {Record<string, string>} values
+ * @param {{ omitAutoAssignedIds?: boolean }} [options]
  */
-export function assetFormToPayload(values) {
+export function assetFormToPayload(values, options = {}) {
   const payload = { ...values };
   Object.keys(payload).forEach((key) => {
     if (key.startsWith('_')) delete payload[key];
   });
   if (!payload.assetid?.trim()) delete payload.assetid;
+  if (options.omitAutoAssignedIds) {
+    delete payload.assetid;
+    delete payload.assetnumber;
+  }
   ASSET_FORM_FIELDS.filter((f) => f.optional).forEach((f) => {
     if (!payload[f.key]?.trim()) delete payload[f.key];
   });

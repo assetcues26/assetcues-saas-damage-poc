@@ -40,7 +40,7 @@ export function MobileAssetCreateReviewPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await complete(assetFormToPayload(values));
+      await complete(assetFormToPayload(values, { omitAutoAssignedIds: true }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create asset');
     } finally {
