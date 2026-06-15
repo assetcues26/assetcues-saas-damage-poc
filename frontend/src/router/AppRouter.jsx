@@ -24,6 +24,7 @@ import { MobileAssetCreateCapturePage } from '../pages/saas/mobile/MobileAssetCr
 import { MobileAssetCreateUploadPage } from '../pages/saas/mobile/MobileAssetCreateUploadPage';
 import { MobileAssetCreateReviewPage } from '../pages/saas/mobile/MobileAssetCreateReviewPage';
 import { MobileAssetCreateDonePage } from '../pages/saas/mobile/MobileAssetCreateDonePage';
+import { MobileAssetTagPage } from '../pages/saas/mobile/MobileAssetTagPage';
 import { V6CatalogPage } from '../pages/v6/V6CatalogPage';
 import { V6AssetPage } from '../pages/v6/V6AssetPage';
 import { V6CapturePage } from '../pages/v6/V6CapturePage';
@@ -58,6 +59,7 @@ export function AppRoutes() {
             <Route element={<SaasShellLayout />}>
               <Route path="/" element={<AssetsDashboardPage />} />
               <Route path="/assets/:id" element={<SaasAssetDetailPage />} />
+              <Route path="/assets/:id/tag" element={<MobileAssetTagPage />} />
               <Route path="/assets/:id/edit" element={<EditAssetPage />} />
               <Route path="/assets/:id/analysis/:aid" element={<AnalysisDeepDivePage />} />
               <Route path="/settings" element={<SaasSettingsPage />} />

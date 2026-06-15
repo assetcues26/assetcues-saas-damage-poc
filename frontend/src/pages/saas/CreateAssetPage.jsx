@@ -8,7 +8,7 @@ import { ProceedButton } from '../../components/ui/ProceedButton';
 import { SaasFlowPageLayout } from '../../components/saas/SaasFlowPageLayout';
 import { useApp } from '../../context/AppContext';
 import { useSaasAssets } from '../../context/SaasAssetsContext';
-import { createSaasAsset, saveWebDraft } from '../../services/saasAssetsApi';
+import { createSaasAsset, registerSaasAsset, saveWebDraft } from '../../services/saasAssetsApi';
 import { useSaasSettings } from '../../context/SaasSettingsContext';
 import { AssetCreateQrPanel } from '../../components/saas/AssetCreateQrPanel';
 import { AssetPhotoUploadPanel } from '../../components/saas/AssetPhotoUploadPanel';
@@ -180,7 +180,23 @@ export function CreateAssetPage() {
       return;
     }
     if (!assetFile && !sessionAssetUrl) {
-      setError('Asset image is required — upload from computer or add via mobile QR');
+      setError(null);
+      setSubmitting(true);
+      try {
+        saveAssetFormPrefs(values);
+        const result = await registerSaasAsset(assetFormToPayload(values));
+        clearWizardDraft();
+        showToast(
+          'Asset saved — add photos on mobile or desktop to run AI validation',
+          'success',
+        );
+        await refreshAll({ silent: true });
+        navigate('/');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to save asset');
+      } finally {
+        setSubmitting(false);
+      }
       return;
     }
 
@@ -239,7 +255,9 @@ export function CreateAssetPage() {
         />
       </div>
       {!hasAssetImage && (
-        <p className="text-sm text-amber-700">Asset image is required before creating.</p>
+        <p className="text-sm text-amber-700">
+          No photos yet — you can save the asset now and add photos later from mobile or desktop.
+        </p>
       )}
     </div>
   );
@@ -274,8 +292,14 @@ export function CreateAssetPage() {
         <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white/95 p-3 pb-safe backdrop-blur-md sm:p-4">
           <PageWrapper>
             <ProceedButton
-              label={submitting ? 'Saving…' : 'Create Asset'}
-              disabled={submitting || !hasAssetImage}
+              label={
+                submitting
+                  ? 'Saving…'
+                  : hasAssetImage
+                    ? 'Create Asset'
+                    : 'Save without photos'
+              }
+              disabled={submitting}
               onClick={submit}
             />
           </PageWrapper>

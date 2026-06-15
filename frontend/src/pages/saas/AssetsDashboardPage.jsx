@@ -8,6 +8,7 @@ import {
   Trash2,
   Eye,
   ImagePlus,
+  Tag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '../../components/ui/Spinner';
@@ -305,7 +306,7 @@ export function AssetsDashboardPage() {
                 />
                 <div className="min-w-0 flex-1">
                   <Link
-                    to={`/assets/${asset.id}`}
+                    to={`/assets/${asset.id}/tag`}
                     className="block truncate font-semibold text-gray-900 hover:text-blue-600"
                   >
                     {asset.assetname || 'Unnamed asset'}
@@ -335,8 +336,18 @@ export function AssetsDashboardPage() {
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap gap-1.5 border-t border-gray-100 pt-3">
-                <RowAction icon={Eye} label="View" onClick={() => navigate(`/assets/${asset.id}`)} />
-                <RowAction icon={Pencil} label="Edit" onClick={() => navigate(`/assets/${asset.id}/edit`)} />
+                <RowAction
+                  icon={asset.asset_image_url ? Eye : Tag}
+                  label={asset.asset_image_url ? 'View' : 'Tag'}
+                  onClick={() =>
+                    navigate(asset.asset_image_url ? `/assets/${asset.id}` : `/assets/${asset.id}/tag`)
+                  }
+                />
+                <RowAction
+                  icon={Pencil}
+                  label="Edit"
+                  onClick={() => navigate(`/assets/${asset.id}/tag`)}
+                />
                 <RowAction
                   icon={RefreshCw}
                   label="Run AI"

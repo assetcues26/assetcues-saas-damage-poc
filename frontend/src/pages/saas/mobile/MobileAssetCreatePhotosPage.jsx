@@ -33,13 +33,18 @@ export function MobileAssetCreatePhotosPage() {
 
   const hasAsset = Boolean(session?.asset_image_url);
   const hasBarcode = Boolean(session?.barcode_image_url);
+  const isExistingAsset = Boolean(session?.draft_json?._existing_asset_id);
   const base = `/assets/create/mobile/${token}/photos`;
 
   return (
     <MobileAssetPageLayout title="Add photos" wrapperClassName="flex flex-1 flex-col py-8">
       <MobileBrandHeader
-        title="Add asset photos"
-        subtitle="Capture or upload the asset image and optional barcode. Photos sync to your computer automatically."
+        title={isExistingAsset ? 'Tag asset photos' : 'Add asset photos'}
+        subtitle={
+          isExistingAsset
+            ? 'Capture or upload photos for this asset. When ready, save to start AI validation.'
+            : 'Capture or upload the asset image and optional barcode. Photos sync to your computer automatically.'
+        }
       />
 
       {(hasAsset || hasBarcode) && (
@@ -97,7 +102,9 @@ export function MobileAssetCreatePhotosPage() {
               <h2 className="text-lg font-bold">Photos ready</h2>
             </div>
             <p className="mt-1 text-sm text-green-800">
-              Return to your computer and click Save to create the asset.
+              {isExistingAsset
+                ? 'Save photos and run AI validation from your phone.'
+                : 'Return to your computer and click Save to create the asset.'}
             </p>
           </Card>
         )}

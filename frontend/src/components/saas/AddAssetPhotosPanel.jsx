@@ -5,6 +5,8 @@ import { AssetCreateQrPanel } from './AssetCreateQrPanel';
 import { uploadSaasAssetImages } from '../../services/saasAssetsApi';
 import { useApp } from '../../context/AppContext';
 import { SESSION_MODE_IMAGES_ONLY } from './assetFormConfig';
+import { enqueueAssetAnalysis } from '../../utils/analysisQueue';
+import { isAiAnalysisEnabled } from '../../utils/saasAiSettings';
 
 /**
  * Upload photos to an existing asset (e.g. metadata-only / pending registration).
@@ -114,9 +116,13 @@ export function AddAssetPhotosPanel({ assetId, assetName, onComplete, onAnalyzin
         {
           sessionToken: sessionToken || undefined,
           onProgress: setUploadPhase,
+          reanalyze: false,
         },
       );
       onAnalyzing?.();
+      if (isAiAnalysisEnabled()) {
+        enqueueAssetAnalysis(assetId).catch(() => {});
+      }
       showToast(
         `Photos saved for ${assetName || 'asset'} — AI analysis started`,
         'success',

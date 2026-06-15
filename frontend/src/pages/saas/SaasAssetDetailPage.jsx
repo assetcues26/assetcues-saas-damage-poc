@@ -149,7 +149,15 @@ export function SaasAssetDetailPage() {
       </div>
 
       {needsPhotos && (
-        <div className="mb-6">
+        <div className="mb-6 lg:hidden">
+          <Button className="mb-4 w-full" onClick={() => navigate(`/assets/${id}/tag`)}>
+            Tag asset on mobile
+          </Button>
+        </div>
+      )}
+
+      {needsPhotos && (
+        <div className="mb-6 hidden lg:block">
           <AddAssetPhotosPanel
             assetId={id}
             assetName={asset.assetname || asset.assetid}
