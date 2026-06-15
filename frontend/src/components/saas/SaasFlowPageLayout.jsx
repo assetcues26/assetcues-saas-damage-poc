@@ -15,7 +15,7 @@ import { SaasBrandWatermark } from './SaasBrandWatermark';
  */
 export function SaasFlowPageLayout({ title, onBack, backLabel = 'Back', children, footer }) {
   return (
-    <div className="relative flex min-h-[100dvh] flex-col bg-zinc-50">
+    <div className="relative flex min-h-[100dvh] flex-col overflow-x-hidden bg-zinc-50">
       <SaasBrandWatermark />
       <CompactHeader
         title={title}

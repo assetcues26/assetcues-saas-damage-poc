@@ -81,7 +81,7 @@ export function EditAssetPage() {
   }
 
   return (
-    <div className="p-6 pb-28">
+    <div className="p-3 pb-24 sm:p-6 sm:pb-28">
       <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate(`/assets/${id}`)}>
         <ArrowLeft size={16} className="mr-1" />
         Back to asset

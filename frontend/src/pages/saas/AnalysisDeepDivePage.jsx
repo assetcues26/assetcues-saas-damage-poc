@@ -35,7 +35,7 @@ export function AnalysisDeepDivePage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       <div className="mb-6 flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/assets/${id}`)}>
           <ArrowLeft size={16} className="mr-1" />

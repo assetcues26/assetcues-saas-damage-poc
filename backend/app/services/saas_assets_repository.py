@@ -36,9 +36,6 @@ logger = structlog.get_logger()
 
 _TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{20,128}$")
 
-# Serialize asset ID/number allocation and inserts (parallel creates share the same demo user).
-_asset_create_lock = asyncio.Lock()
-
 ASSET_METADATA_KEYS = (
     "assetid",
     "assetname",
@@ -397,11 +394,6 @@ class SaasAssetsRepository:
             "assetnumber": self._generate_assetnumber_sync(user_id),
         }
 
-    @staticmethod
-    def _is_unique_violation(exc: Exception) -> bool:
-        msg = str(exc).lower()
-        return "duplicate" in msg or "unique" in msg or "23505" in msg
-
     def _expire_session_if_needed(self, row: dict) -> dict:
         expires = self._parse_ts(row.get("expires_at"))
         if (
@@ -454,30 +446,20 @@ class SaasAssetsRepository:
         existing_barcode_image_path: str | None = None,
     ) -> dict:
         data = {k: metadata.get(k) for k in ASSET_METADATA_KEYS}
+        if not str(data.get("assetid") or "").strip():
+            data["assetid"] = self._generate_assetid_sync(user_id)
+        if not str(data.get("assetnumber") or "").strip():
+            data["assetnumber"] = self._generate_assetnumber_sync(user_id)
         if not str(data.get("customerid") or "").strip() and str(data.get("companyid") or "").strip():
             data["customerid"] = str(data["companyid"]).strip()
         data["cost"] = self._normalize_cost(data.get("cost"))
         data["user_id"] = user_id
         data["ai_status"] = "pending"
 
-        row: dict | None = None
-        last_exc: Exception | None = None
-        for _ in range(8):
-            data["assetid"] = self._generate_assetid_sync(user_id)
-            data["assetnumber"] = self._generate_assetnumber_sync(user_id)
-            try:
-                insert_result = self._table("registered_assets").insert(data).execute()
-                row = (insert_result.data or [None])[0]
-                if row:
-                    break
-                raise RuntimeError("Failed to create asset")
-            except Exception as exc:
-                if self._is_unique_violation(exc):
-                    last_exc = exc
-                    continue
-                raise
+        insert_result = self._table("registered_assets").insert(data).execute()
+        row = (insert_result.data or [None])[0]
         if not row:
-            raise RuntimeError("Failed to create asset — could not allocate unique ID") from last_exc
+            raise RuntimeError("Failed to create asset")
 
         asset_id = row["id"]
         updates: dict[str, Any] = {}
@@ -637,8 +619,7 @@ class SaasAssetsRepository:
         return SaasAssetDetailResponse(asset=summary, latest_analysis=latest)
 
     async def get_next_asset_identifiers(self, user_id: int) -> dict[str, str]:
-        async with _asset_create_lock:
-            return await asyncio.to_thread(self._get_next_identifiers_sync, user_id)
+        return await asyncio.to_thread(self._get_next_identifiers_sync, user_id)
 
     async def create_asset(
         self,
@@ -653,16 +634,15 @@ class SaasAssetsRepository:
         meta = dict(metadata)
         meta["_has_asset_image"] = bool(asset_image)
         validate_create_metadata(meta)
-        async with _asset_create_lock:
-            row = await asyncio.to_thread(
-                self._create_asset_row_sync,
-                user_id,
-                meta,
-                asset_image,
-                barcode_image,
-                asset_mime=asset_mime,
-                barcode_mime=barcode_mime,
-            )
+        row = await asyncio.to_thread(
+            self._create_asset_row_sync,
+            user_id,
+            meta,
+            asset_image,
+            barcode_image,
+            asset_mime=asset_mime,
+            barcode_mime=barcode_mime,
+        )
         await self.log_activity(
             user_id,
             "asset_created",
@@ -682,14 +662,13 @@ class SaasAssetsRepository:
         """Create asset record without images; stays pending until photos + analyze."""
         meta = dict(metadata)
         validate_create_metadata(meta, require_asset_image=False)
-        async with _asset_create_lock:
-            row = await asyncio.to_thread(
-                self._create_asset_row_sync,
-                user_id,
-                meta,
-                None,
-                None,
-            )
+        row = await asyncio.to_thread(
+            self._create_asset_row_sync,
+            user_id,
+            meta,
+            None,
+            None,
+        )
         await self.log_activity(
             user_id,
             "asset_created",
@@ -1036,10 +1015,9 @@ class SaasAssetsRepository:
     async def complete_asset_session(
         self, token: str, metadata: dict[str, Any], *, auto_analyze: bool = True, skip_ai: bool = False
     ) -> CompleteAssetSessionResponse:
-        async with _asset_create_lock:
-            return await asyncio.to_thread(
-                self._complete_asset_session_sync, token, metadata, auto_analyze, skip_ai
-            )
+        return await asyncio.to_thread(
+            self._complete_asset_session_sync, token, metadata, auto_analyze, skip_ai
+        )
 
     def _complete_asset_session_sync(
         self, token: str, metadata: dict[str, Any], auto_analyze: bool = True, skip_ai: bool = False

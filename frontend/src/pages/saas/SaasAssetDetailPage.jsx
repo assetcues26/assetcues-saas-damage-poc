@@ -113,7 +113,7 @@ export function SaasAssetDetailPage() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
           <ArrowLeft size={16} className="mr-1" />

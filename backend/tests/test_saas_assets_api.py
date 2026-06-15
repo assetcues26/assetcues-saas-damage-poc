@@ -103,14 +103,6 @@ def test_next_asset_identifiers(saas_settings):
     assert "tagnumber" not in body
 
 
-def test_is_unique_violation_detects_postgres_duplicate():
-    from app.services.saas_assets_repository import SaasAssetsRepository
-
-    assert SaasAssetsRepository._is_unique_violation(Exception('duplicate key value violates unique constraint'))
-    assert SaasAssetsRepository._is_unique_violation(Exception('23505'))
-    assert not SaasAssetsRepository._is_unique_violation(Exception('connection timeout'))
-
-
 def test_clear_all_analyses(saas_settings):
     mock_repo = MagicMock()
     mock_repo.enabled = True

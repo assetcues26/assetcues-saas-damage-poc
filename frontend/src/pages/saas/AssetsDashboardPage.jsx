@@ -177,12 +177,12 @@ export function AssetsDashboardPage() {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Assets Dashboard</h1>
+    <div className="p-3 sm:p-6">
+      <div className="mb-4 sm:mb-6">
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Assets Dashboard</h1>
           <p className="text-sm text-gray-600">{total} registered assets</p>
 
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-6">
             {STAT_CARDS.map((card) => (
               <button
                 key={card.label}
@@ -207,8 +207,8 @@ export function AssetsDashboardPage() {
       </div>
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="relative w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               type="search"
@@ -218,13 +218,14 @@ export function AssetsDashboardPage() {
                 setSearch(e.target.value);
                 setPage(0);
               }}
-              className="rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm"
+              className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm sm:min-w-[200px]"
             />
           </div>
+          <div className="flex flex-wrap gap-2">
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value)}
-            className="rounded-lg border border-gray-300 px-2 py-2 text-sm"
+            className="min-w-0 flex-1 rounded-lg border border-gray-300 px-2 py-2 text-sm sm:flex-none"
           >
             {SORT_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -243,9 +244,10 @@ export function AssetsDashboardPage() {
             <RefreshCw size={16} className="mr-1" />
             Refresh
           </Button>
+          </div>
         </div>
-        <Link to="/assets/create">
-          <Button variant="primary" size="sm">Create asset</Button>
+        <Link to="/assets/create" className="w-full sm:w-auto">
+          <Button variant="primary" size="sm" className="w-full sm:w-auto">Create asset</Button>
         </Link>
       </div>
 
@@ -282,7 +284,72 @@ export function AssetsDashboardPage() {
           <p className="text-gray-600">No assets yet. Create your first asset to get started.</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+        <>
+        <div className="space-y-3 lg:hidden">
+          {assets.map((asset) => (
+            <article
+              key={asset.id}
+              className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
+            >
+              <div className="flex gap-3">
+                <input
+                  type="checkbox"
+                  className="mt-1 shrink-0"
+                  checked={selectedIds.includes(asset.id)}
+                  onChange={() => toggleSelected(asset.id)}
+                  aria-label={`Select ${asset.assetname || asset.assetid}`}
+                />
+                <AssetThumbnail
+                  src={asset.asset_image_url}
+                  alt={asset.assetname || asset.assetid}
+                />
+                <div className="min-w-0 flex-1">
+                  <Link
+                    to={`/assets/${asset.id}`}
+                    className="block truncate font-semibold text-gray-900 hover:text-blue-600"
+                  >
+                    {asset.assetname || 'Unnamed asset'}
+                  </Link>
+                  <p className="truncate text-xs text-gray-500">{asset.assetid}</p>
+                  <p className="mt-1 text-sm font-medium text-gray-800">
+                    {asset.cost != null ? `₹${Number(asset.cost).toLocaleString('en-IN')}` : '—'}
+                  </p>
+                  <div className="mt-2">
+                    <AiStatusBadge
+                      status={asset.ai_status}
+                      onClick={
+                        asset.ai_status === 'fail'
+                          ? () => openFailure(asset)
+                          : asset.latest_analysis_id
+                            ? () => openFullAnalysis(asset)
+                            : undefined
+                      }
+                    />
+                  </div>
+                  {asset.ai_status !== 'analyzing' && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      <MatchBadge label="Name" value={asset.namedescriptionmatch} />
+                      <MatchBadge label="Cost" value={asset.costmatch} />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1.5 border-t border-gray-100 pt-3">
+                <RowAction icon={Eye} label="View" onClick={() => navigate(`/assets/${asset.id}`)} />
+                <RowAction icon={Pencil} label="Edit" onClick={() => navigate(`/assets/${asset.id}/edit`)} />
+                <RowAction
+                  icon={RefreshCw}
+                  label="Run AI"
+                  disabled={rerunningId === asset.id || !asset.asset_image_url}
+                  onClick={() => handleRerun(asset.id)}
+                />
+                <RowAction icon={Download} label="PDF" onClick={() => handleExportPdf(asset)} />
+              </div>
+            </article>
+          ))}
+        </div>
+
+        <div className="hidden rounded-xl border border-gray-200 bg-white shadow-sm lg:block">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] table-auto text-left text-sm">
               <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
@@ -400,6 +467,7 @@ export function AssetsDashboardPage() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {pageCount > 1 && (

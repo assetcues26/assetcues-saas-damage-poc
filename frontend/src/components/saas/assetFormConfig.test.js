@@ -51,16 +51,6 @@ describe('assetFormConfig', () => {
     expect(payload.assetid).toBeUndefined();
   });
 
-  it('omits auto-assigned ids for create submit', () => {
-    const payload = assetFormToPayload(
-      { ...valid, assetid: 'AST-10099', assetnumber: 'FAR9999' },
-      { omitAutoAssignedIds: true },
-    );
-    expect(payload.assetid).toBeUndefined();
-    expect(payload.assetnumber).toBeUndefined();
-    expect(payload.assetname).toBe('Dell Latitude');
-  });
-
   it('strips internal session meta keys from payload', () => {
     const payload = assetFormToPayload({ ...valid, _session_mode: 'images_only' });
     expect(payload._session_mode).toBeUndefined();

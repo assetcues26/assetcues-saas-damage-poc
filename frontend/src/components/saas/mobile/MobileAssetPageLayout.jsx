@@ -27,7 +27,7 @@ export function MobileAssetPageLayout({
 
   return (
     <div
-      className={`relative flex min-h-[100dvh] flex-col ${
+      className={`relative flex min-h-[100dvh] flex-col overflow-x-hidden ${
         isDark ? 'bg-zinc-950 text-white' : 'bg-zinc-50'
       }`}
     >

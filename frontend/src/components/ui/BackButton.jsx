@@ -14,7 +14,7 @@ export function BackButton({ label = 'Back', onClick, variant = 'light' }) {
       aria-label={label}
     >
       <ChevronLeft size={20} />
-      <span>{label}</span>
+      <span className="hidden sm:inline">{label}</span>
     </button>
   );
 }

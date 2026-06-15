@@ -11,7 +11,7 @@ const NAV = [
 
 export function SaasSidebar() {
   return (
-    <aside className="relative z-10 flex w-56 shrink-0 flex-col border-r border-gray-200 bg-white">
+    <aside className="relative z-10 hidden w-56 shrink-0 flex-col border-r border-gray-200 bg-white lg:flex">
       <div className="border-b border-gray-200 px-4 py-5">
         <NavLink to="/" className="inline-block transition-opacity hover:opacity-90" title="Dashboard">
           <AssetCuesLogo variant="sidebar" />

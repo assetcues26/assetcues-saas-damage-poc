@@ -121,7 +121,7 @@ export function MobileAssetCreateLandingPage() {
         subtitle="Fill in the form below. Your answers are saved when you continue to photos."
       />
 
-      <form onSubmit={proceedToPhotos} className="mx-auto mt-6 flex w-full max-w-lg flex-1 flex-col gap-6">
+      <form onSubmit={proceedToPhotos} className="mx-auto mt-4 flex w-full max-w-lg flex-1 flex-col gap-4 sm:mt-6 sm:gap-6">
         <MobileCreateStepHeader step={1} label="Enter asset information" />
         <MobileFormProgress values={values} />
         <SessionExpiryCountdown expiresAt={expiresAt} />

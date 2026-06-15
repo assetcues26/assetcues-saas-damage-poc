@@ -202,7 +202,7 @@ export function CreateAssetPage() {
 
       saveAssetFormPrefs(values);
       const result = await createSaasAsset(
-        assetFormToPayload(values, { omitAutoAssignedIds: true }),
+        assetFormToPayload(values),
         imageFile,
         barcode || undefined,
         { autoAnalyze: false, skipAi: !aiAnalysisEnabled },
