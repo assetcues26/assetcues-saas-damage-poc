@@ -305,11 +305,12 @@ export function SaasAssetsProvider({ children }) {
   );
 
   const bulkDelete = useCallback(async () => {
-    if (!selectedIds.length) return;
-    await bulkDeleteSaasAssets(selectedIds);
+    if (!selectedIds.length) return null;
+    const result = await bulkDeleteSaasAssets(selectedIds);
     setSelectedIds([]);
     await load({ silent: true });
     await loadStats();
+    return result;
   }, [selectedIds, load, loadStats]);
 
   const exportCsv = useCallback(async () => {

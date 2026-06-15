@@ -783,7 +783,13 @@ async def delete_asset(
 ) -> None:
     rate_limiter.check("saas_assets")
     _require_saas(repo)
-    deleted = await repo.delete_asset(settings.demo_user_id, str(asset_id))
+    try:
+        deleted = await repo.delete_asset(settings.demo_user_id, str(asset_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("saas_delete_asset_failed", asset_id=str(asset_id), error=str(exc))
+        raise HTTPException(status_code=503, detail="Failed to delete asset") from exc
     if not deleted:
         raise HTTPException(status_code=404, detail="Asset not found")
 

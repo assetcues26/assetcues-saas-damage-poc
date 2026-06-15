@@ -141,17 +141,29 @@ export function AssetsDashboardPage() {
 
   const handleDelete = async (asset) => {
     if (!window.confirm(`Delete ${asset.assetname || asset.assetid}?`)) return;
-    await deleteSaasAsset(asset.id);
-    showToast('Asset deleted', 'success');
-    refresh({ silent: true });
+    try {
+      await deleteSaasAsset(asset.id);
+      showToast('Asset deleted', 'success');
+      await refresh({ silent: true });
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Failed to delete asset', 'error');
+    }
   };
 
   const handleBulkDelete = async () => {
     if (!window.confirm(`Delete ${selectedIds.length} selected assets?`)) return;
     setBulkBusy(true);
     try {
-      await bulkDelete();
-      showToast('Selected assets deleted', 'success');
+      const result = await bulkDelete();
+      const processed = result?.processed ?? selectedIds.length;
+      const total = selectedIds.length;
+      if (processed < total) {
+        showToast(`Deleted ${processed} of ${total} assets — some could not be removed`, 'warning');
+      } else {
+        showToast('Selected assets deleted', 'success');
+      }
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Failed to delete assets', 'error');
     } finally {
       setBulkBusy(false);
     }
@@ -355,6 +367,12 @@ export function AssetsDashboardPage() {
                   onClick={() => handleRerun(asset.id)}
                 />
                 <RowAction icon={Download} label="PDF" onClick={() => handleExportPdf(asset)} />
+                <RowAction
+                  icon={Trash2}
+                  label="Delete"
+                  variant="danger"
+                  onClick={() => handleDelete(asset)}
+                />
               </div>
             </article>
           ))}

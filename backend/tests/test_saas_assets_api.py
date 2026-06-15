@@ -373,6 +373,23 @@ def test_delete_asset_success(saas_settings):
     assert response.status_code == 204
 
 
+def test_delete_asset_conflict(saas_settings):
+    mock_repo = MagicMock()
+    mock_repo.enabled = True
+    mock_repo.delete_asset = AsyncMock(
+        side_effect=ValueError("Could not delete asset — it may still be linked to a mobile session")
+    )
+
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: saas_settings
+    app.dependency_overrides[get_repo] = lambda: mock_repo
+    client = TestClient(app)
+
+    response = client.delete(f"/v1/saas/assets/{TEST_ASSET_ID}")
+    assert response.status_code == 409
+    assert "mobile session" in response.json()["detail"]
+
+
 def test_bulk_delete_success(saas_settings):
     mock_repo = MagicMock()
     mock_repo.enabled = True

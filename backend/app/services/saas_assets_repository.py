@@ -1312,6 +1312,14 @@ class SaasAssetsRepository:
             return False
         row = rows[0]
         self._remove_storage_paths([row.get("asset_image_path"), row.get("barcode_image_path")])
+
+        # Mobile create sessions reference assets without ON DELETE — clear before delete.
+        self._table("asset_create_sessions").update({"created_asset_id": None}).eq(
+            "created_asset_id", asset_id
+        ).eq("user_id", user_id).execute()
+
+        self._table("asset_analyses").delete().eq("asset_id", asset_id).execute()
+
         self._log_activity_sync(
             user_id,
             "asset_deleted",
@@ -1320,7 +1328,25 @@ class SaasAssetsRepository:
             assetname=row.get("assetname"),
             assetid=row.get("assetid"),
         )
-        self._table("registered_assets").delete().eq("id", asset_id).eq("user_id", user_id).execute()
+        try:
+            self._table("registered_assets").delete().eq("id", asset_id).eq(
+                "user_id", user_id
+            ).execute()
+        except Exception as exc:
+            logger.exception("saas_delete_asset_failed", asset_id=asset_id, error=str(exc))
+            raise ValueError(
+                "Could not delete asset — it may still be linked to a mobile session"
+            ) from exc
+
+        still_exists = (
+            self._table("registered_assets")
+            .select("id")
+            .eq("id", asset_id)
+            .limit(1)
+            .execute()
+        )
+        if still_exists.data:
+            raise ValueError("Asset delete did not complete — please refresh and try again")
         return True
 
     async def bulk_delete(self, user_id: int, asset_ids: list[str]) -> int:
