@@ -1420,17 +1420,21 @@ class SaasAssetsRepository:
         for aid in asset_ids:
             result = (
                 self._table("registered_assets")
-                .select("id")
+                .select("id, asset_image_path, barcode_image_path")
                 .eq("id", aid)
                 .eq("user_id", user_id)
                 .limit(1)
                 .execute()
             )
-            if result.data:
-                self._table("registered_assets").update({"ai_status": "analyzing"}).eq(
-                    "id", aid
-                ).execute()
-                queued.append(aid)
+            if not result.data:
+                continue
+            row = result.data[0]
+            if not row.get("asset_image_path") and not row.get("barcode_image_path"):
+                continue
+            self._table("registered_assets").update({"ai_status": "analyzing"}).eq(
+                "id", aid
+            ).execute()
+            queued.append(aid)
         return queued
 
     async def get_dashboard_stats(self, user_id: int) -> dict[str, int]:

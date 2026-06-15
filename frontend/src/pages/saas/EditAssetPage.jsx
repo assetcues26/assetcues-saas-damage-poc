@@ -14,6 +14,7 @@ import {
 import { fetchSaasAsset, updateSaasAsset } from '../../services/saasAssetsApi';
 import { useApp } from '../../context/AppContext';
 import { useSaasAssets } from '../../context/SaasAssetsContext';
+import { isAiAnalysisEnabled } from '../../utils/saasAiSettings';
 
 export function EditAssetPage() {
   const { id } = useParams();
@@ -59,9 +60,13 @@ export function EditAssetPage() {
     setSaving(true);
     setError(null);
     try {
-      markAssetAnalyzing(id);
-      await updateSaasAsset(id, assetFormToPayload(values), { reanalyze: true });
-      showToast('Changes saved — AI analysis started', 'success');
+      const runAi = hasAssetImage && isAiAnalysisEnabled();
+      if (runAi) markAssetAnalyzing(id);
+      await updateSaasAsset(id, assetFormToPayload(values), { reanalyze: runAi });
+      showToast(
+        runAi ? 'Changes saved — AI analysis started' : 'Changes saved',
+        'success',
+      );
       await refresh({ silent: true });
       navigate('/');
     } catch (e) {

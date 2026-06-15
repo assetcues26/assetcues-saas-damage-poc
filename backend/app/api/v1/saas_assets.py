@@ -632,6 +632,11 @@ async def update_asset(
     if not updated:
         raise HTTPException(status_code=404, detail="Asset not found")
     if reanalyze:
+        detail = await repo.get_asset(settings.demo_user_id, str(asset_id))
+        if not detail:
+            raise HTTPException(status_code=404, detail="Asset not found")
+        if not detail.asset.asset_image_url and not detail.asset.barcode_image_url:
+            return UpdateAssetResponse(asset=detail.asset)
         await repo.set_ai_status(str(asset_id), "analyzing")
         background_tasks.add_task(
             _background_analyze, settings, str(asset_id), settings.demo_user_id, None
